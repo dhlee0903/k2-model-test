@@ -101,6 +101,7 @@
 <div id="dock">
   <div class="grp">조작</div>
   <button class="tile" id="bCharge"><b>노리쇠</b><kbd>F</kbd></button>
+  <button class="tile" id="bCatch"><b>노리쇠<br>멈치</b><kbd>C</kbd></button>
   <button class="tile" id="bMag"><b>탄창 분리</b><kbd>R</kbd></button>
   <button class="tile" id="bNew"><b>새 탄창</b><kbd>N</kbd></button>
   <div class="grp">부착</div>
@@ -257,6 +258,22 @@ function word(txt, color='#e9e9e9', h=0.085){
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
   return new THREE.Mesh(new THREE.PlaneGeometry(h*2, h), new THREE.MeshBasicMaterial({ map:t, transparent:true, depthWrite:false }));
 }
+// text engraved into a flat face: dark cut letters with a light lower lip, bump-mapped so they read as cut in.
+// draw(g) paints with the current fillStyle into a W×H canvas that covers w×h units; faces -z when left = true
+function engraved(draw, W, H, w, h, left){
+  const cv = document.createElement('canvas'), bm = document.createElement('canvas');
+  cv.width = bm.width = W; cv.height = bm.height = H;
+  const g = cv.getContext('2d'), gb = bm.getContext('2d');
+  gb.fillStyle = '#fff'; gb.fillRect(0, 0, W, H);
+  g.save(); g.translate(1.5, 1.5); g.fillStyle = 'rgba(210,214,218,.5)'; draw(g); g.restore();
+  g.fillStyle = 'rgba(14,15,16,.9)'; draw(g);
+  gb.fillStyle = '#000'; draw(gb);
+  const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map:tex, bumpMap:new THREE.CanvasTexture(bm), bumpScale:0.004,
+    transparent:true, depthWrite:false, roughness:0.5, metalness:0.5, polygonOffset:true, polygonOffsetFactor:-2 }));
+  if (left) m.rotation.y = Math.PI;
+  return m;
+}
 // handguard cross-section: round with deep lengthwise flutes
 function fluted(R, depth, n){
   const s = new THREE.Shape(), N = n*16;
@@ -299,10 +316,16 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(flip, rbox(0.15, 0.035, 0.2, 0.012, M.gunDark), -0.06, 0.02, 0);               // second leaf lying back
   at(flip, cylZ(0.022, 0.24, M.dsteel, 12), 0, 0, 0);                                // flip pivot
   at(rs, cylX(0.022, 0.04, M.black, 12), -0.78, SIGHT_Y, 0);
+  at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.62, 0.86, -0.225); at(rs, box(0.07, 0.01, 0.006, M.black), -0.62, 0.86, -0.237);   // left-side screw
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
   const port = at(rec, box(0.85, 0.18, 0.02, M.black), 0.525, 0.57, 0.335);
   const slot = at(rec, box(1.6, 0.05, 0.02, M.black), 0.25, 0.5, 0.335);
-  parts.portCover.push(port, slot);
+  const hole = at(rec, rbox(0.42, 0.05, 0.02, 0.02, M.black), 0.2, 0.26, 0.335);       // the elongated hole low on the right of the upper
+  parts.portCover.push(port, slot, hole);
+  // scope-mount bolt on top of the upper at the front: raised boss with a bolt in it
+  at(rec, cylY(0.07, 0.05, M.gun, 20), 1.0, 0.785, 0);
+  at(rec, cylY(0.04, 0.03, M.dsteel, 16), 1.0, 0.82, 0);
+  at(rec, box(0.06, 0.008, 0.012, M.black), 1.0, 0.836, 0);
   // --- lower receiver: shallow (photo: bottom ≈ y -0.2), flared magwell, takedown pins, magazine release with fence ---
   rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.0],[1.26,-0.14],[1.32,-0.22],[0.06,-0.22],[0.06,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.56, M.gun, 0.035));
   at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.2, 0);
@@ -338,29 +361,47 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(sel, cylZ(0.018, 0.012, M.steel, 16), 0, 0, -0.026);                            // pivot screw
   // +z rotation is clockwise as seen from the left, so each step is a quarter turn further
   parts.SEL_ANG = [0, Math.PI*0.5, Math.PI, Math.PI*1.5];
-  // markings engraved into the receiver: dark letters with a light lower edge, plus a bump map so they read as cut in
-  (function(){
-    const N = 512, R = 0.115, SZ = 0.42, cv = document.createElement('canvas'); cv.width = cv.height = N;
-    const bm = document.createElement('canvas'); bm.width = bm.height = N;
-    const g = cv.getContext('2d'), gb = bm.getContext('2d');
-    gb.fillStyle = '#fff'; gb.fillRect(0, 0, N, N);
+  // markings engraved into the receiver around the lever
+  const SZ = 0.42, SR = 0.115;
+  const selMark = engraved(g=>{
+    g.font = 'bold 34px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     [['안 전', 0], ['단 발', 1], ['연 발', 2], ['점 사', 3]].forEach(([t, i])=>{
-      const a = parts.SEL_ANG[i], x = N/2 - Math.cos(a)*R/SZ*N, y = N/2 - Math.sin(a)*R/SZ*N;   // canvas x runs toward the stock (seen from the left)
-      g.font = 'bold 34px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = 'rgba(210,214,218,.55)'; g.fillText(t, x + 1.5, y + 1.5);
-      g.fillStyle = 'rgba(14,15,16,.9)'; g.fillText(t, x, y);
-      gb.font = g.font; gb.textAlign = 'center'; gb.textBaseline = 'middle'; gb.fillStyle = '#000'; gb.fillText(t, x, y);
+      const a = parts.SEL_ANG[i];
+      g.fillText(t, 256 - Math.cos(a)*SR/SZ*512, 256 - Math.sin(a)*SR/SZ*512);   // canvas x runs toward the stock (seen from the left)
     });
-    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
-    const mark = new THREE.Mesh(new THREE.PlaneGeometry(SZ, SZ), new THREE.MeshStandardMaterial({ map:tex, bumpMap:new THREE.CanvasTexture(bm), bumpScale:0.004,
-      transparent:true, depthWrite:false, roughness:0.5, metalness:0.5, polygonOffset:true, polygonOffsetFactor:-2 }));
-    mark.rotation.y = Math.PI; mark.position.set(SX, SY, LZ - 0.0015); rec.add(mark);
-    parts.portCover.push(mark);          // hidden in clear view with the receiver skin
-  })();
+  }, 512, 512, SZ, SZ, true);
+  selMark.position.set(SX, SY, LZ - 0.0015); rec.add(selMark); parts.portCover.push(selMark);   // hidden in clear view with the receiver skin
+  // left side of the lower: model / calibre marking ahead of the bolt catch
+  const roll = engraved(g=>{
+    g.font = 'bold 40px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText('소총 5.56MM K2', 20, 46); g.font = 'bold 32px "Malgun Gothic", sans-serif'; g.fillText('대우정밀', 20, 100);
+  }, 512, 128, 0.6, 0.15, true);
+  roll.position.set(0.82, -0.05, LZ - 0.0015); rec.add(roll); parts.portCover.push(roll);
+  // bolt catch (노리쇠멈치, photos): left side just behind the magwell, ribbed paddle on top of a long lever, no lower
+  // button (K2 differs from the AR here: you lock the bolt back by pulling the paddle UP, and press it DOWN to release)
+  const bc = new THREE.Group(); bc.position.set(0.06, 0.0, LZ - 0.012); rec.add(bc); parts.boltCatch = bc;
+  at(bc, rbox(0.15, 0.07, 0.03, 0.01, M.dsteel), 0, 0.07, -0.01);
+  for (let k=-2;k<=2;k++) at(bc, box(0.008, 0.06, 0.006, M.black), k*0.025, 0.07, -0.027);
+  at(bc, rbox(0.045, 0.2, 0.02, 0.008, M.dsteel), 0.0, -0.05, 0);
+  at(bc, cylZ(0.018, 0.03, M.steel, 12), 0.0, -0.13, -0.005);
+  tag(bc, 'boltcatch');
+  // rear sling loop (photo): swivel block at the back of the lower on the left, big D-loop hanging from it
+  at(rec, rbox(0.12, 0.12, 0.05, 0.02, M.gun), -1.17, 0.02, LZ - 0.02);
+  at(rec, cylZ(0.02, 0.08, M.steel, 10), -1.17, 0.02, LZ - 0.04);
+  const loopS = new THREE.Shape(); loopS.moveTo(-0.1, 0); loopS.lineTo(0.1, 0); loopS.quadraticCurveTo(0.12, -0.34, 0, -0.34); loopS.quadraticCurveTo(-0.12, -0.34, -0.1, 0);
+  const loopH = new THREE.Path(); loopH.moveTo(-0.075, -0.025); loopH.lineTo(0.075, -0.025); loopH.quadraticCurveTo(0.09, -0.31, 0, -0.31); loopH.quadraticCurveTo(-0.09, -0.31, -0.075, -0.025);
+  loopS.holes.push(loopH);
+  const sling = extrude(loopS, 0.018, M.dsteel, 0.006); sling.position.set(-1.17, 0.02, LZ - 0.075); sling.rotation.z = -0.35; rec.add(sling);
+  // left side of the upper (photo): small raised pad ahead of the port area, slotted screw on the sight housing
+  at(rec, rbox(0.3, 0.12, 0.03, 0.02, M.gun), 0.85, 0.6, -0.33);
   tag(sel, 'selector');
   // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
   at(rec, rbox(0.28, 0.86, 0.64, 0.05, M.gun), -1.38, 0.3, 0);
-  [0.08, 0.38, 0.62].forEach(y=>at(rec, cylY(0.07, 0.2, M.gunDark, 20), -1.5, y, 0.31));
+  // stock hinge (photo): one tall hinge barrel on the right rear, knuckle splits, pin head on top, release latch below
+  at(rec, cylY(0.07, 0.78, M.gunDark, 24), -1.5, 0.3, 0.31);
+  [0.12, 0.3, 0.5].forEach(y=>at(rec, cylY(0.072, 0.008, M.black, 24), -1.5, y, 0.31));
+  at(rec, cylY(0.045, 0.03, M.steel, 16), -1.5, 0.705, 0.31);
+  at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.36);
   const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.31); rec.add(hinge); parts.stock = hinge;
   const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.31); hinge.add(sg);
   // photo: top almost level (0.47 at the hinge → 0.57 at the butt), bottom a straight slope from the butt's lower corner
@@ -373,6 +414,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const hg = extrude(fluted(0.355, 0.08, 12), 1.84, M.poly, 0.02); hg.rotation.y = Math.PI/2; hg.position.set(1.36, 0.42, 0); rec.add(hg);
   at(rec, cylX(0.38, 0.06, M.gunDark, 32), 1.33, 0.42, 0);
   at(rec, cylX(0.31, 0.44, M.gunDark, 32), 3.4, 0.44, 0);
+  [1, -1].forEach(sd=>{ at(rec, cylZ(0.04, 0.02, M.dsteel, 16), 3.42, 0.44, sd*0.31); at(rec, box(0.07, 0.01, 0.01, M.black), 3.42, 0.44, sd*0.321); });   // cap screw
   at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.24, 0.44, 0);
   at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.58, 0.44, 0);
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
@@ -398,8 +440,14 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, rbox(0.12, 0.14, 0.12, 0.02, M.gunDark), 4.97, 0.78, 0);
   at(rec, box(0.035, 0.2, 0.035, M.gunDark), 4.97, SIGHT_Y - 0.1, 0);
   const hood = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.034, 12, 32), M.gunDark); hood.rotation.y = Math.PI/2; at(rec, shadowed(hood), 4.97, 1.03, 0);
-  at(rec, box(0.06, 0.12, 0.05, M.gunDark), 4.62, 0.27, 0);
-  at(rec, shadowed(new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.016, 8, 20), M.dsteel)), 4.62, 0.14, 0);
+  // front sling swivel (photo): band clamped round the barrel, lug under it, D-ring hanging from the swivel pin
+  at(rec, cylX(0.1, 0.08, M.gunDark, 24), 4.62, BORE, 0);
+  at(rec, rbox(0.08, 0.08, 0.07, 0.015, M.gunDark), 4.62, 0.26, 0);
+  at(rec, cylZ(0.015, 0.1, M.steel, 10), 4.62, 0.24, 0);
+  const dring = new THREE.Shape(); dring.moveTo(-0.07, 0.0); dring.lineTo(0.07, 0.0); dring.quadraticCurveTo(0.07, -0.16, 0, -0.16); dring.quadraticCurveTo(-0.07, -0.16, -0.07, 0.0);
+  const dpath = new THREE.Path(); dpath.moveTo(-0.045, -0.02); dpath.lineTo(0.045, -0.02); dpath.quadraticCurveTo(0.045, -0.135, 0, -0.135); dpath.quadraticCurveTo(-0.045, -0.135, -0.045, -0.02);
+  dring.holes.push(dpath);
+  const dr = extrude(dring, 0.02, M.dsteel, 0.006); dr.position.set(4.62, 0.24, -0.01); rec.add(dr);
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
   // --- slotted flash hider ---
   at(rec, cylX(0.1, 0.75, M.gunDark, 28), 6.79, BORE, 0);
@@ -682,7 +730,7 @@ const S = {
   carrier:0, carrierV:0, dragging:false, extracted:false, charging:null,
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
-  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, spent:false, cycle:null, feed:null,
+  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, spent:false, cycle:null, feed:null, held:false, catchUp:0,
   hits:0, points:0, rangeShots:0,
 };
 let msg = '', msgT = 0;
@@ -758,6 +806,7 @@ function fire(){
 function pullTrigger(){
   if (S.trigger) return; S.trigger = true;
   if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사격 (D)'); return; }
+  if (S.held){ say('노리쇠 후퇴고정 상태 — 노리쇠멈치를 눌러 전진 (C)'); return; }
   if (S.selector === 0){ SND.safe(); say('안전 상태 — 조정간을 돌리세요 (Q)'); return; }
   if (!S.cocked){ say('공이치기가 풀려 있어요 — 노리쇠를 당기세요 (F)'); return; }
   if (S.cooldown > 0) return;
@@ -783,13 +832,35 @@ function chargeExtract(){
   if (S.extracted) return; S.extracted = true; S.cocked = true;
   SND.bolt(0.45);
 }
+// bolt hold-open. An empty magazine's follower pushes the catch up, so the carrier stays back after the last round
+// (also when charging over an empty magazine). By hand: pull the charging handle back and lift the catch.
+// Release: press the catch, or pull the handle back a little and let go; the carrier runs home and chambers a round.
+const emptyMagSeated = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count === 0;
+function lastRoundHold(){ if (!emptyMagSeated()) return false; S.held = true; S.burst = 0; SND.bolt(0.4); say('마지막 탄 — 노리쇠 후퇴고정됨'); return true; }
+function releaseHold(){
+  if (!S.held) return false;
+  if (emptyMagSeated()){ SND.click(); say('빈 탄창의 받침판이 노리쇠멈치를 밀고 있어요 — 탄창 교체 (N)'); return false; }
+  S.held = false; S.carrierV = 0;
+  if (canFeed()) feedFromMag();
+  setTimeout(()=>SND.bolt(0.75), 40);
+  renderHud(); return true;
+}
+function boltCatch(){
+  if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사용 (D)'); return; }
+  if (S.held){ if (releaseHold()) say('노리쇠멈치 누름 — 노리쇠 전진'); return; }
+  // lock back by hand: handle all the way back, thumb lifts the catch, ease the handle onto it
+  if (S.charging || S.cycle || S.dragging) return;
+  S.charging = { t:0, lock:true };
+}
 function chargeRelease(){
+  if (S.charging && S.charging.lock){ S.held = true; S.extracted = false; S.dragging = false; SND.safe(); say('노리쇠 후퇴고정'); renderHud(); return; }
+  if (S.extracted && emptyMagSeated()){ S.held = true; S.extracted = false; S.dragging = false; SND.bolt(0.4); say('빈 탄창 — 노리쇠 후퇴고정됨'); renderHud(); return; }
   if (S.extracted && canFeed()) feedFromMag();
   S.extracted = false; S.dragging = false;
   setTimeout(()=>SND.bolt(0.7), 60);
   renderHud();
 }
-function chargeAuto(){ if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사용 (D)'); return; } if (!S.charging && !S.dragging && !S.cycle) S.charging = { t:0 }; }
+function chargeAuto(){ if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사용 (D)'); return; } if (S.held){ if (releaseHold()) say('장전손잡이 당겼다 놓음 — 노리쇠 전진'); return; } if (!S.charging && !S.dragging && !S.cycle) S.charging = { t:0 }; }
 
 // magazine: detach (it stays beside the rifle with its rounds) / attach / swap for a full one
 function toggleMag(){
@@ -823,7 +894,7 @@ function toggleBayonet(){
 // field strip in two steps: carrier group out as a unit, then the carrier group itself apart (labels name each part)
 function toggleDisasm(){
   if (view !== 'inspect') setView('inspect');
-  S.disasm = (S.disasm + 1) % 3; S.charging = null; S.trigger = false; S.burst = 0;   // 0 assembled → 1 carrier group out → 2 carrier group stripped
+  S.disasm = (S.disasm + 1) % 3; S.held = false; S.charging = null; S.trigger = false; S.burst = 0;   // 0 assembled → 1 carrier group out → 2 carrier group stripped
   burst({ freq:1600, q:2, vol:0.45, dur:0.05 }); tone(700, 0.15, 0.06, 'square', 0.04);
   renderHud();
 }
@@ -893,10 +964,10 @@ const TOUCH = matchMedia('(pointer: coarse)').matches;
 if (TOUCH) document.body.classList.add('touch');
 function setHint(){
   const h = document.getElementById('hint');
-  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · R 탄창 · B 대검 · Tab 점검';
+  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · R 탄창 · B 대검 · Tab 점검';
   else if (TOUCH) h.textContent = '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 탄창/대검/개머리판도 눌러보세요';
   else h.textContent = TOUCH ? '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 조정간/탄창/개머리판도 눌러보세요'
-                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
+                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
 }
 
 // ---------- HUD ----------
@@ -912,6 +983,7 @@ function renderHud(){
   if (msgT > 0) t = msg;
   else if (S.disasm === 1) t = '분해 1단계 — 노리쇠뭉치를 누르거나 D로 노리쇠뭉치 분해';
   else if (S.disasm === 2) t = '노리쇠뭉치 분해 — D로 조립';
+  else if (S.held) t = S.mag && S.attached && S.mag.count > 0 ? '노리쇠 후퇴고정 — 노리쇠멈치를 눌러 장전 (C)' : '노리쇠 후퇴고정 — 탄창 교체 (N) 후 노리쇠멈치 (C)';
   else if (!S.chambered && !(S.mag && S.attached)) t = '탄창이 분리돼 있어요 — 탄창 결합 (R)';
   else if (S.spent && !S.cycle) t = '약실에 빈 탄피 — 노리쇠를 당기세요 (F)';
   else if (!S.chambered && S.mag.count > 0) t = '약실이 비었어요 — 노리쇠를 당기세요 (F)';
@@ -924,6 +996,7 @@ function renderHud(){
   document.getElementById('bMag').classList.toggle('on', !S.attached);
   document.getElementById('bStock').classList.toggle('on', S.folded);
   document.getElementById('bClear').classList.toggle('on', S.clear);
+  document.getElementById('bCatch').classList.toggle('on', S.held);
   document.getElementById('gasChip').textContent = `가스 ${GAS[S.gas]}`;
   document.getElementById('bBay').classList.toggle('on', S.bayonet);
   document.querySelector('#bDis b').textContent = ['분해', '노리쇠 분해', '조립'][S.disasm];
@@ -955,10 +1028,12 @@ cvs.addEventListener('pointerdown', e=>{
   const part = hit.object.userData.part;
   if (S.disasm && (part === 'bcg' || part === 'handle')){ active = 'ui'; if (S.disasm === 1) toggleDisasm(); }
   else if (part === 'handle' && !S.disasm){
-    active = 'handle'; S.dragging = true; S.extracted = false; S.cycle = null; S.charging = null;
+    active = 'handle'; S.dragging = true; S.cycle = null; S.charging = null;
+    S.extracted = S.held; S.held = false;          // grabbing the handle takes the carrier off the catch; letting go sends it home
     dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), hit.point);
     dragX0 = rec.worldToLocal(hit.point.clone()).x; dragC0 = S.carrier;
   } else if (part === 'selector'){ active = 'ui'; cycleSelector(); }
+  else if (part === 'boltcatch'){ active = 'ui'; boltCatch(); }
   else if (part === 'mag'){ active = 'ui'; toggleMag(); }
   else if (part === 'stock'){ active = 'ui'; toggleStock(); }
   else if (part === 'bayonet'){ active = 'ui'; toggleBayonet(); }
@@ -1004,6 +1079,7 @@ fireBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); ac(); fireBtn.s
 fireBtn.addEventListener('pointerup', releaseTrigger);
 fireBtn.addEventListener('pointercancel', releaseTrigger);
 document.getElementById('bCharge').onclick = ()=>{ ac(); chargeAuto(); };
+document.getElementById('bCatch').onclick = ()=>{ ac(); boltCatch(); };
 document.getElementById('bMag').onclick = ()=>{ ac(); toggleMag(); };
 document.getElementById('bNew').onclick = ()=>{ ac(); newMag(); };
 document.getElementById('bStock').onclick = ()=>{ ac(); toggleStock(); };
@@ -1021,6 +1097,7 @@ addEventListener('keydown', e=>{
     case 'Space': e.preventDefault(); pullTrigger(); break;
     case 'KeyQ': cycleSelector(); break;
     case 'KeyF': chargeAuto(); break;
+    case 'KeyC': boltCatch(); break;
     case 'KeyR': toggleMag(); break;
     case 'KeyN': newMag(); break;
     case 'KeyV': toggleStock(); break;
@@ -1056,16 +1133,18 @@ function animate(){
     const u = c.t/c.dur, BACK = 0.4;
     if (u < BACK){ const k = u/BACK; S.carrier = TRAVEL*(1 - (1 - k)*(1 - k)); }
     else {
-      if (!c.fed){ c.fed = true; SND.bolt(0.25); if (canFeed()) feedFromMag(); }
+      if (!c.fed){ c.fed = true; SND.bolt(0.25); if (lastRoundHold()){ S.cycle = null; S.carrier = TRAVEL; renderHud(); } else if (canFeed()) feedFromMag(); }
       const k = Math.min(1, (u - BACK)/(1 - BACK)); S.carrier = TRAVEL*(1 - k*k);
     }
-    if (u >= 1){ S.carrier = 0; S.carrierV = 0; S.cycle = null; }
+    if (S.cycle && u >= 1){ S.carrier = 0; S.carrierV = 0; S.cycle = null; }
   } else if (S.charging){
     // manual charge (F / button): a quick snatch back, then let go
     const back = 0.09;
     S.charging.t += dt;
     S.carrier = Math.min(TRAVEL, S.charging.t/back*TRAVEL);
-    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + 0.03){ S.charging = null; chargeRelease(); } }
+    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + (S.charging.lock ? 0.12 : 0.03)){ chargeRelease(); S.charging = null; } }
+  } else if (S.held){
+    S.carrier = TRAVEL;                // caught by the bolt catch
   } else if (!S.dragging){
     const k = 2500;                   // spring snaps the carrier home
     for (let i=0;i<4;i++) [S.carrier, S.carrierV] = spring(S.carrier, S.carrierV, 0, k, 2*Math.sqrt(k)*1.05, dt/4);
@@ -1102,6 +1181,9 @@ function animate(){
   const hp = Math.max(S.hammer, THREE.MathUtils.clamp(S.carrier/0.5, 0, 1));
   parts.hammer.rotation.z = parts.HAM_FALL + hp*(parts.HAM_COCK - parts.HAM_FALL);
 
+  const up = S.held || (S.charging && S.charging.lock && S.carrier > 0.9) ? 1 : 0;
+  S.catchUp += (up - S.catchUp) * Math.min(1, dt*25);
+  parts.boltCatch.position.y = S.catchUp*0.035;
   parts.trigger.rotation.z += ((S.trigger ? -0.3 : 0) - parts.trigger.rotation.z) * Math.min(1, dt*30);
   parts.selector.rotation.z += (S.selAng - parts.selector.rotation.z) * Math.min(1, dt*20);
   const ga = parts.GAS_ANG[S.gas]; parts.gas.rotation.x += (ga - parts.gas.rotation.x) * Math.min(1, dt*16);
