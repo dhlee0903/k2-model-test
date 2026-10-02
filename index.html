@@ -281,37 +281,38 @@ const parts = { portCover:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
 
 (function buildRifle(){
-  // --- upper receiver: raised rear-sight hump, sloped nose, side ledge ---
-  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.18,0.76],[0.32,0.77],[0.14,0.86],[-0.95,0.88],[-1.12,0.82],[-1.25,0.66]]), 0.6, M.gun, 0.035));
+  // --- upper receiver: flat top (photo y 0.77), sloped nose, side ledge ---
+  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]), 0.6, M.gun, 0.035));
   [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
   [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
   // rear sight: knurled drum on the hump, aperture on the sight line
   const rs = new THREE.Group(); rec.add(rs); parts.rearSight = rs;
-  at(rs, rbox(0.52, 0.08, 0.46, 0.03, M.gun), -0.55, 0.91, 0);
-  at(rs, cylZ(0.13, 0.3, M.gunDark, 32), -0.55, 1.0, 0);
-  for (let k=-3;k<=3;k++) at(rs, new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.007, 4, 32), M.gunDark), -0.55, 1.0, k*0.042);
-  at(rs, cylZ(0.05, 0.36, M.dsteel, 16), -0.55, 1.0, 0);
+  at(rs, rbox(0.52, 0.1, 0.46, 0.03, M.gun), -0.55, 0.8, 0);
+  at(rs, cylZ(0.13, 0.3, M.gunDark, 32), -0.55, 0.95, 0);
+  for (let k=-3;k<=3;k++) at(rs, new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.007, 4, 32), M.gunDark), -0.55, 0.95, k*0.042);
+  at(rs, cylZ(0.05, 0.36, M.dsteel, 16), -0.55, 0.95, 0);
   at(rs, cylX(0.022, 0.02, M.black, 12), -0.685, SIGHT_Y, 0);
   // ejection port + charging-handle slot (right side)
   const port = at(rec, box(0.85, 0.16, 0.02, M.black), 0.45, 0.42, 0.335);
   const slot = at(rec, box(1.55, 0.05, 0.02, M.black), 0.25, 0.65, 0.335);
   parts.portCover.push(port, slot);
-  // --- lower receiver: flared magwell, takedown pins, magazine release with fence ---
-  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,-0.08],[1.24,-0.42],[1.32,-0.55],[0.06,-0.55],[0.06,-0.44],[-0.02,-0.36],[-0.5,-0.36],[-0.95,-0.33],[-1.25,-0.1]]), 0.56, M.gun, 0.035));
-  at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.53, 0);
+  // --- lower receiver: shallow (photo: bottom ≈ y -0.2), flared magwell, takedown pins, magazine release with fence ---
+  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.0],[1.26,-0.14],[1.32,-0.22],[0.06,-0.22],[0.06,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.56, M.gun, 0.035));
+  at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.2, 0);
   [[-1.02,0.02],[1.12,0.02]].forEach(([x,y])=>at(rec, cylZ(0.05, 0.64, M.dsteel, 16), x, y, 0));
   // fire-control pins (AR layout): trigger pin in front and lower, hammer pin behind and higher
-  const TRIG_PIN = [-0.02, -0.2], HAM_PIN = [-0.24, -0.08];
+  const TRIG_PIN = [-0.1, -0.1], HAM_PIN = [-0.24, 0.0];
   [TRIG_PIN, HAM_PIN].forEach(([x,y])=>at(rec, cylZ(0.03, 0.6, M.dsteel, 12), x, y, 0));
-  at(rec, cylZ(0.055, 0.08, M.dsteel), 0.2, -0.18, 0.3);
-  at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 20), M.gun), 0.2, -0.18, 0.3);
-  rec.add(profile(shape([[-0.5,-0.36],[-0.5,-0.64],[-0.5,-0.7,-0.43,-0.7],[0.02,-0.7],[0.08,-0.7,0.08,-0.63],[0.08,-0.44],[0.02,-0.44],[0.02,-0.63],[-0.43,-0.63],[-0.43,-0.36]]), 0.14, M.gun, 0.015));
-  // trigger pivots on its pin: blade hangs down into the guard, tail reaches back under the hammer to hold it cocked
+  at(rec, cylZ(0.055, 0.08, M.dsteel), 0.2, -0.07, 0.3);
+  at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 20), M.gun), 0.2, -0.07, 0.3);
+  rec.add(profile(shape([[-0.5,-0.2],[-0.5,-0.48],[-0.5,-0.54,-0.43,-0.54],[0.02,-0.54],[0.08,-0.54,0.08,-0.47],[0.08,-0.2],[0.02,-0.2],[0.02,-0.47],[-0.43,-0.47],[-0.43,-0.2]]), 0.14, M.gun, 0.015));
+  // trigger pivots on its pin: blade hangs down the middle of the guard (room for a finger in front of it),
+  // curved face forward, tip at the bottom; tail reaches back under the hammer to hold it cocked
   const trig = new THREE.Group(); trig.position.set(TRIG_PIN[0], TRIG_PIN[1], 0);
-  trig.add(profile(shape([[0.04,0.03],[-0.2,0.05],[-0.22,0.0],[-0.04,-0.05],[-0.08,-0.2,0.0,-0.4],[0.04,-0.38],[-0.02,-0.22,0.06,0.0]]), 0.07, M.dsteel, 0.01));
+  trig.add(profile(shape([[0.05,0.03],[-0.2,0.05],[-0.22,0.0],[-0.06,-0.06],[-0.17,-0.2,-0.15,-0.34],[-0.1,-0.35],[-0.11,-0.2,0.04,-0.08]]), 0.07, M.dsteel, 0.01));
   rec.add(trig); parts.trigger = trig;
-  // --- pistol grip: A2-style rake with beavertail, finger bump, checkered panels ---
-  rec.add(profile(shape([[-0.34,-0.34],[-0.9,-0.34],[-0.98,-0.42],[-1.38,-1.22],[-1.42,-1.36,-1.28,-1.42],[-0.98,-1.46],[-0.84,-1.44,-0.86,-1.32],[-0.68,-0.98],[-0.56,-0.82,-0.6,-0.72],[-0.42,-0.42]]), 0.42, M.gripPoly, 0.05));
+  // --- pistol grip (photo: top x -1.0…-0.5 under the receiver, bottom x -1.5…-0.95 at y≈-1.4), finger bump, checkered panels ---
+  rec.add(profile(shape([[-0.46,-0.18],[-1.0,-0.18],[-1.07,-0.26],[-1.47,-1.2],[-1.52,-1.36,-1.38,-1.41],[-1.0,-1.45],[-0.86,-1.43,-0.88,-1.31],[-0.76,-1.0],[-0.64,-0.84,-0.68,-0.72],[-0.52,-0.36]]), 0.42, M.gripPoly, 0.05));
   // --- selector (left): knob at the narrow end, plate bulges into a lobe and comes to a point ---
   // seen from the left the muzzle is to the viewer's left. K2 marks run clockwise from the muzzle side:
   // 안전 (toward the muzzle) → 단발 (up) → 연발 (toward the stock) → 점사 (down), and the lever turns all the way round
@@ -338,10 +339,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   [0.08, 0.38, 0.62].forEach(y=>at(rec, cylY(0.07, 0.2, M.gunDark, 20), -1.5, y, 0.31));
   const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.31); rec.add(hinge); parts.stock = hinge;
   const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.31); hinge.add(sg);
-  // photo measurements: wrist (x≈-2.0) spans y 0.46…-0.11, butt end (x≈-4.29) spans 0.6…-0.73
-  sg.add(profile(shape([[-1.52,0.46],[-4.02,0.595],[-4.2,0.595,-4.2,0.44],[-4.18,-0.6],[-4.17,-0.734,-4.0,-0.734],[-3.85,-0.734],[-3.15,-0.6,-2.7,-0.3],[-2.3,-0.12,-1.52,-0.06]]), 0.42, M.poly, 0.07));
-  at(sg, rbox(0.1, 1.33, 0.5, 0.05, M.rubber), -4.25, -0.07, 0);
-  at(sg, cylZ(0.035, 0.5, M.dsteel, 12), -3.9, -0.58, 0);
+  // photo: top almost level (0.47 at the hinge → 0.57 at the butt), bottom a straight slope from the butt's lower corner
+  // (-4.0, -0.72) up to the wrist (-1.57, -0.06); butt end slightly convex with rounded corners, no separate pad
+  sg.add(profile(shape([[-1.52,0.47],[-4.08,0.57],[-4.3,0.57,-4.31,0.42],[-4.36,-0.08,-4.24,-0.56],[-4.18,-0.73,-4.0,-0.73],[-1.52,-0.05]]), 0.42, M.poly, 0.07));
+  at(sg, cylZ(0.035, 0.44, M.dsteel, 12), -3.75, -0.6, 0);
   tag(hinge, 'stock');
   // --- deeply fluted handguard, end caps, exposed gas tube over the barrel ---
   // photo: handguard x 1.41…3.18, y 0.05…0.77
@@ -437,10 +438,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // hammer on its pin: falls forward onto the firing-pin head, leans back under the carrier when cocked
   const hammer = new THREE.Group(); hammer.position.set(HAM_PIN[0], HAM_PIN[1], 0); rec.add(hammer); parts.hammer = hammer;
   at(hammer, cylZ(0.06, 0.08, M.dsteel, 16), 0, 0, 0);
-  at(hammer, rbox(0.09, 0.48, 0.08, 0.02, M.dsteel), 0, 0.24, 0);
-  at(hammer, rbox(0.12, 0.12, 0.08, 0.02, M.dsteel), 0.01, 0.51, 0);
+  at(hammer, rbox(0.09, 0.42, 0.08, 0.02, M.dsteel), 0, 0.21, 0);
+  at(hammer, rbox(0.12, 0.12, 0.08, 0.02, M.dsteel), 0.01, 0.45, 0);
   at(hammer, rbox(0.1, 0.05, 0.06, 0.015, M.dsteel), 0.06, -0.04, 0);         // hook the trigger tail catches
-  parts.HAM_FALL = -0.62; parts.HAM_COCK = 1.2;
+  parts.HAM_FALL = -0.79; parts.HAM_COCK = 1.2;   // fallen: head on the firing-pin head (≈0.13, 0.36)
   const ch = makeRound(true); ch.rotation.z = -Math.PI/2; ch.position.set(1.28, BORE, 0); rec.add(ch); parts.chamberRound = ch;
   // bolt strip seen through the ejection port when the shell is opaque
   const strip = at(rec, box(0.85, 0.12, 0.02, M.steel), 0.45, 0.42, 0.34); parts.bolt = strip;
