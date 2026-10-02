@@ -306,7 +306,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
 
 (function buildRifle(){
   // --- upper receiver: flat top (photo y 0.77), sloped nose, side ledge ---
-  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]), 0.6, M.gun, 0.035));
+  // the ejection port is a real opening (x 0.1…0.95, y 0.22…0.64): through it you see the carrier, and with the bolt
+  // locked back the empty chamber, the bolt face and the top round in the magazine (the way you check the chamber).
+  // The cut goes through the whole profile, so a plate closes it again on the left side.
+  const upperShape = shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]);
+  const portHole = new THREE.Path(); { const x0 = 0.1, x1 = 0.95, y0 = 0.22, y1 = 0.64, r = 0.06;
+    portHole.moveTo(x0 + r, y0); portHole.lineTo(x1 - r, y0); portHole.quadraticCurveTo(x1, y0, x1, y0 + r); portHole.lineTo(x1, y1 - r); portHole.quadraticCurveTo(x1, y1, x1 - r, y1);
+    portHole.lineTo(x0 + r, y1); portHole.quadraticCurveTo(x0, y1, x0, y1 - r); portHole.lineTo(x0, y0 + r); portHole.quadraticCurveTo(x0, y0, x0 + r, y0); }
+  upperShape.holes.push(portHole);
+  rec.add(profile(upperShape, 0.6, M.gun, 0.035));
+  at(rec, box(0.95, 0.5, 0.03, M.gun), 0.525, 0.43, -0.3);                            // left wall over the cut
+  const portIn = new THREE.MeshStandardMaterial({ color:0x0e0f10, roughness:0.7, metalness:0.4, side:THREE.BackSide });
+  at(rec, new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.43, 0.6), portIn), 0.525, 0.43, 0);   // dark inside of the receiver seen through the port
   [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
   [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
   // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
@@ -331,10 +342,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   tag(flip, 'rearsight');
   at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.62, 0.86, -0.225); at(rs, box(0.07, 0.01, 0.006, M.black), -0.62, 0.86, -0.237);   // left-side screw
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
-  const port = at(rec, box(0.85, 0.18, 0.02, M.black), 0.525, 0.57, 0.335);
-  const slot = at(rec, box(1.6, 0.05, 0.02, M.black), 0.25, 0.5, 0.335);
-  const hole = at(rec, rbox(0.42, 0.05, 0.02, 0.02, M.black), 0.2, 0.26, 0.335);       // the elongated hole low on the right of the upper
-  parts.portCover.push(port, slot, hole);
+  const slot = at(rec, box(0.66, 0.05, 0.02, M.black), -0.23, 0.5, 0.335);            // charging-handle slot behind the port
+  const hole = at(rec, rbox(0.42, 0.05, 0.02, 0.02, M.black), -0.4, 0.26, 0.335);       // the elongated hole low on the right of the upper
+  parts.portCover.push(slot, hole);
   // scope-mount bolt on top of the upper at the front: raised boss with a bolt in it
   at(rec, cylY(0.07, 0.05, M.gun, 20), 1.0, 0.785, 0);
   at(rec, cylY(0.04, 0.03, M.dsteel, 16), 1.0, 0.82, 0);
@@ -403,7 +413,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   roll.position.set(0.82, -0.05, LZ - 0.0015); rec.add(roll); parts.portCover.push(roll);
   // bolt catch (노리쇠멈치, photos): left side just behind the magwell, ribbed paddle on top of a long lever, no lower
   // button (K2 differs from the AR here: you lock the bolt back by pulling the paddle UP, and press it DOWN to release)
-  const bc = new THREE.Group(); bc.position.set(0.06, 0.0, LZ - 0.012); rec.add(bc); parts.boltCatch = bc;
+  const bc = new THREE.Group(); bc.position.set(0.06, 0.0, LZ - 0.012); rec.add(bc); parts.boltCatch = bc; parts.BC_BASE = bc.position.clone();
   at(rec, rbox(0.07, 0.26, 0.006, 0.01, M.black), 0.075, -0.02, LZ - 0.001);          // recess the arm sits in
   const pad = new THREE.Shape(); pad.absellipse(0, 0, 0.072, 0.046, 0, Math.PI*2, false, 0);
   const padM = extrude(pad, 0.014, M.dsteel, 0.006); padM.position.set(0, 0.075, -0.026); bc.add(padM);
@@ -453,13 +463,63 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(sg, cylZ(0.035, 0.42, M.dsteel, 12), -3.75, -0.62, 0);                              // sling pin through the butt
   tag(hinge, 'stock');
   // --- deeply fluted handguard, end caps, exposed gas tube over the barrel ---
-  // photo: handguard x 1.41…3.18, y 0.05…0.77
-  const hg = extrude(fluted(0.355, 0.08, 12), 1.84, M.poly, 0.02); hg.rotation.y = Math.PI/2; hg.position.set(1.36, 0.42, 0); rec.add(hg);
-  at(rec, cylX(0.38, 0.06, M.gunDark, 32), 1.33, 0.42, 0);
-  at(rec, cylX(0.31, 0.44, M.gunDark, 32), 3.4, 0.44, 0);
-  [1, -1].forEach(sd=>{ at(rec, cylZ(0.04, 0.02, M.dsteel, 16), 3.42, 0.44, sd*0.31); at(rec, box(0.07, 0.01, 0.01, M.black), 3.42, 0.44, sd*0.321); });   // cap screw
-  at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.24, 0.44, 0);
-  at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.58, 0.44, 0);
+  // handguard (photos): NOT a tube — two moulded halves (left/right) that meet along a seam top and bottom, a squarish
+  // rounded section (photo x 1.41…3.18, y 0.05…0.77) with raised ribs running lengthwise down each side, stepping in at
+  // the front to a narrower collar where screws hold the halves together
+  const hgSection = (a, b, ribs)=>{
+    const sh = new THREE.Shape(), N = 160;
+    for (let i=0;i<=N;i++){
+      const t = i/N*Math.PI*2, c = Math.cos(t), sn = Math.sin(t);
+      let u = a*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), v = b*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2);
+      if (ribs){ const ang = Math.atan2(Math.abs(sn), Math.abs(c)); if ([0.12, 0.42, 0.72, 1.02, 1.3].some(r=>Math.abs(ang - r) < 0.05)){ const k = 1 + 0.016/Math.hypot(u, v); u *= k; v *= k; } }
+      i ? sh.lineTo(u, v) : sh.moveTo(u, v);
+    }
+    return sh;
+  };
+  const HGY = 0.42;
+  const hgBody = extrude(hgSection(0.315, 0.345, false), 1.68, M.poly, 0.012); hgBody.rotation.y = Math.PI/2; hgBody.position.set(1.37, HGY, 0); rec.add(hgBody);   // x 1.37…3.05
+  // step in toward the collar
+  const hgStep = extrude(hgSection(0.315, 0.345, false), 0.12, M.poly, 0.0); hgStep.rotation.y = Math.PI/2; hgStep.position.set(3.05, HGY, 0);
+  { const pa = hgStep.geometry.attributes.position; for (let i=0;i<pa.count;i++){ const k = THREE.MathUtils.lerp(1, 0.84, THREE.MathUtils.clamp(pa.getZ(i)/0.12, 0, 1)); pa.setX(i, pa.getX(i)*k); pa.setY(i, pa.getY(i)*k); } pa.needsUpdate = true; hgStep.geometry.computeVertexNormals(); }
+  rec.add(hgStep);
+  const hgCollar = extrude(hgSection(0.265, 0.29, false), 0.45, M.poly, 0.012); hgCollar.rotation.y = Math.PI/2; hgCollar.position.set(3.17, HGY, 0); rec.add(hgCollar);   // x 3.17…3.62
+  [HGY + 0.347, HGY - 0.347].forEach(y=>at(rec, box(1.8, 0.006, 0.01, M.black), 2.3, y, 0));            // seam between the halves
+  // details on the surface of each half (photos): 4 long grooves with rounded ends pressed into the side, and a row of
+  // 4 oval vent holes along the upper shoulder. Each is a flat stadium laid tangent to the section at angle t.
+  const HA = 0.315, HB = 0.345, secPt = t=>{ const c = Math.cos(t), sn = Math.sin(t);
+    return new THREE.Vector2(HA*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), HB*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2)); };
+  const stadium = (len, w)=>{ const sh = new THREE.Shape(), r = w/2; sh.moveTo(-len/2 + r, -r); sh.lineTo(len/2 - r, -r); sh.absarc(len/2 - r, 0, r, -Math.PI/2, Math.PI/2, false); sh.lineTo(-len/2 + r, r); sh.absarc(-len/2 + r, 0, r, Math.PI/2, Math.PI*1.5, false); return sh; };
+  const grooveM = new THREE.MeshStandardMaterial({ color:0x050506, roughness:0.6, envMapIntensity:0.5 }), rimM = new THREE.MeshStandardMaterial({ color:0x111214, roughness:0.3, envMapIntensity:0.9 });
+  SHELL.push([grooveM, 0.14], [rimM, 0.14]);
+  // lay a flat shape onto the section surface: shape x runs along the handguard, shape y is arc length round the section
+  const onSurface = (sh, x, t, mat, lift)=>{
+    const g = new THREE.ShapeGeometry(sh, 12), pa = g.attributes.position;
+    const sp = secPt(t + 0.005).sub(secPt(t - 0.005)).length()/0.01;               // arc length per unit angle at t
+    for (let i=0;i<pa.count;i++){
+      const tt = t + pa.getY(i)/sp, p = secPt(tt), d = secPt(tt + 0.005).sub(secPt(tt - 0.005));
+      const n = new THREE.Vector2(d.y, -d.x).normalize(); if (n.dot(p) < 0) n.negate();
+      const l = lift + 0.012;                                                       // the extrusion's bevel pushes the skin out 0.012
+      pa.setXYZ(i, x + pa.getX(i), HGY + p.y + n.y*l, -(p.x + n.x*l));
+    }
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); m.material.side = THREE.DoubleSide; rec.add(m); return m;
+  };
+  [0, Math.PI].forEach(side=>{
+    [-0.42, -0.14, 0.14, 0.42].forEach(t=>{                                                // grooves: dark floor with a lighter rim
+      onSurface(stadium(1.38, 0.1), 2.18, side + t, rimM, 0.0015);
+      onSurface(stadium(1.34, 0.07), 2.18, side + t, grooveM, 0.003);
+    });
+    [1.62, 1.97, 2.32, 2.67].forEach(x=>{                                                  // vent holes along the top shoulder
+      const t = side === 0 ? 1.3 : Math.PI - 1.3;
+      onSurface(stadium(0.24, 0.085), x, t, rimM, 0.0015);
+      onSurface(stadium(0.22, 0.065), x, t, M.black, 0.003);
+    });
+  });
+  [HGY + 0.292, HGY - 0.292].forEach(y=>at(rec, box(0.45, 0.006, 0.01, M.black), 3.4, y, 0));
+  at(rec, cylX(0.38, 0.06, M.gunDark, 32), 1.33, HGY, 0);                                              // receiver ring at the back
+  [1, -1].forEach(sd=>{ at(rec, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);          // screws through the collar
+    at(rec, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(rec, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); });
+  at(rec, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(rec, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0);   // screw on top of the collar
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
   at(rec, cylX(0.06, 2.3, M.gunDark, 16), 2.45, 0.64, 0);                // gas tube (under the handguard)
   at(rec, cylX(0.08, 5.1, M.gunDark, 28), 3.85, BORE, 0);               // barrel
@@ -588,9 +648,14 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(handle, cylZ(0.028, 0.2, M.gun), 0, 0, -0.08);                                  // stem from the carrier out through the slot
   at(handle, rbox(0.4, 0.05, 0.022, 0.008, M.gun), 0.17, -0.005, 0.048);             // slide plate
   at(handle, rbox(0.06, 0.1, 0.022, 0.008, M.gun), 0.36, 0.02, 0.048);               // its stepped front end
-  at(handle, cylZ(0.07, 0.12, M.gunDark, 24), 0, 0, 0.11);                          // knob
-  const hring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.018, 8, 24), M.gunDark); at(handle, shadowed(hring), 0, 0, 0.17);
-  at(handle, cylZ(0.04, 0.01, M.black, 16), 0, 0, 0.166);                            // hollow end
+  // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
+  // the outer end hollowed out into a cup
+  const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
+    [0.078,0.19],[0.074,0.205],[0.062,0.21],[0.05,0.205],[0.04,0.19],[0.02,0.182],[0.0,0.18]];
+  const knob = shadowed(new THREE.Mesh(new THREE.LatheGeometry(knobPts.map(([r, z])=>new THREE.Vector2(r, z)), 36), M.gunDark));
+  knob.rotation.x = Math.PI/2; handle.add(knob);                                     // lathe axis (y) → +z, out from the receiver
+  at(handle, cylX(0.009, 0.004, M.black, 10), 0.047, 0, 0.13);                        // cross-pin hole in the waist
+  at(handle, cylZ(0.012, 0.004, M.black, 10), 0, 0, 0.182);                          // small hole at the bottom of the cup
   tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
   // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
@@ -849,7 +914,7 @@ const S = {
   carrier:0, carrierV:0, dragging:false, extracted:false, charging:null,
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
-  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, gasAng:0, gasPush:0, spent:false, cycle:null, feed:null, held:false, catchUp:0, flip:0, flipA:0,
+  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, gasAng:0, gasPush:0, spent:false, cycle:null, feed:null, held:false, catchPulled:false, catchUp:0, flip:0, flipA:0,
   hits:0, points:0, rangeShots:0,
 };
 let msg = '', msgT = 0;
@@ -951,8 +1016,8 @@ function chargeExtract(){
   if (S.extracted) return; S.extracted = true; S.cocked = true;
   SND.bolt(0.45);
 }
-// bolt hold-open. An empty magazine's follower pushes the catch up, so the carrier stays back after the last round
-// (also when charging over an empty magazine). By hand: pull the charging handle back and lift the catch.
+// bolt hold-open. An empty magazine's follower pushes the catch, so the carrier stays back after the last round
+// (also when charging over an empty magazine). By hand: pull the catch out, then pull the charging handle back and let go.
 // Release: press the catch, or pull the handle back a little and let go; the carrier runs home and chambers a round.
 const emptyMagSeated = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count === 0;
 function lastRoundHold(){ if (!emptyMagSeated()) return false; S.held = true; S.burst = 0; SND.bolt(0.4); say('마지막 탄 — 노리쇠 후퇴고정됨'); return true; }
@@ -967,12 +1032,13 @@ function releaseHold(){
 function boltCatch(){
   if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사용 (D)'); return; }
   if (S.held){ if (releaseHold()) say('노리쇠멈치 누름 — 노리쇠 전진'); return; }
-  // lock back by hand: handle all the way back, thumb lifts the catch, ease the handle onto it
-  if (S.charging || S.cycle || S.dragging) return;
-  S.charging = { t:0, lock:true };
+  // K2: the catch is pulled OUT from the receiver with the thumb; with it held out, pull the charging handle back and
+  // let go and the carrier stays back on it. Pressing the catch again before that just lets it spring back in.
+  S.catchPulled = !S.catchPulled; SND.safe();
+  say(S.catchPulled ? '노리쇠멈치 당김 — 이 상태로 장전손잡이를 당겼다 놓으면 후퇴고정 (F)' : '노리쇠멈치 놓음');
 }
 function chargeRelease(){
-  if (S.charging && S.charging.lock){ S.held = true; S.extracted = false; S.dragging = false; SND.safe(); say('노리쇠 후퇴고정'); renderHud(); return; }
+  if (S.catchPulled && S.extracted){ S.held = true; S.catchPulled = false; S.extracted = false; S.dragging = false; SND.bolt(0.4); say('노리쇠 후퇴고정'); renderHud(); return; }
   if (S.extracted && emptyMagSeated()){ S.held = true; S.extracted = false; S.dragging = false; SND.bolt(0.4); say('빈 탄창 — 노리쇠 후퇴고정됨'); renderHud(); return; }
   if (S.extracted && canFeed()) feedFromMag();
   S.extracted = false; S.dragging = false;
@@ -1268,7 +1334,7 @@ function animate(){
     const back = 0.09;
     S.charging.t += dt;
     S.carrier = Math.min(TRAVEL, S.charging.t/back*TRAVEL);
-    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + (S.charging.lock ? 0.12 : 0.03)){ chargeRelease(); S.charging = null; } }
+    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + 0.03){ chargeRelease(); S.charging = null; } }
   } else if (S.held){
     S.carrier = TRAVEL;                // caught by the bolt catch
   } else if (!S.dragging){
@@ -1283,7 +1349,7 @@ function animate(){
   parts.recoilSpring.scale.y = Math.max(0.3, 2.86 - S.carrier);   // supporter (x -1.06) to the stop inside the op-rod tube (x 1.8 - carrier)
   // bolt strip in the port (opaque mode): the part of the carrier/bolt (x 0.12…1.29) that is behind the port
   const b0 = 0.12 - S.carrier, b1 = 1.29 - S.carrier, lo = Math.max(b0, PORT0), hi = Math.min(b1, PORT1);
-  parts.bolt.visible = !S.clear && hi > lo && S.ex < 0.05; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
+  parts.bolt.visible = false; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
   // whatever is in the chamber is held by the extractor and rides back on the bolt face until it clears the port
   if ((S.chambered || S.spent) && !S.feed && S.carrier > EJECT_AT*TRAVEL){ eject(S.chambered); S.chambered = S.spent = false; renderHud(); }
   // feeding round: waits under the feed lips until the bolt face (x = 1.29 - carrier) catches its rim, then is pushed
@@ -1308,9 +1374,12 @@ function animate(){
   parts.hammer.rotation.z = parts.HAM_FALL + hp*(parts.HAM_COCK - parts.HAM_FALL);
 
   S.flipA += (S.flip - S.flipA) * Math.min(1, dt*14); parts.flip.rotation.z = -S.flipA*Math.PI/2;   // flips forward onto the other leaf
-  const up = S.held || (S.charging && S.charging.lock && S.carrier > 0.9) ? 1 : 0;
+  const up = S.held || S.catchPulled ? 1 : 0;
   S.catchUp += (up - S.catchUp) * Math.min(1, dt*25);
-  parts.boltCatch.position.y = S.catchUp*0.035;
+  // the catch swings outward about a pivot at the bottom of its arm (top of the paddle comes away from the receiver)
+  const ca = -0.38*S.catchUp, cpy = -0.1;
+  parts.boltCatch.rotation.x = ca;
+  parts.boltCatch.position.set(parts.BC_BASE.x, parts.BC_BASE.y + cpy - cpy*Math.cos(ca), parts.BC_BASE.z - cpy*Math.sin(ca));
   parts.trigger.rotation.z += ((S.trigger ? -0.3 : 0) - parts.trigger.rotation.z) * Math.min(1, dt*30);
   parts.selector.rotation.z += (S.selAng - parts.selector.rotation.z) * Math.min(1, dt*20);
   parts.gas.rotation.x += (S.gasAng - parts.gas.rotation.x) * Math.min(1, dt*12);
