@@ -537,7 +537,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // underneath and are held by screws through the collar. Squarish rounded section (photo x 1.41…3.18, y 0.05…0.77),
   // stepping in at the front to a narrower collar. Each half is its own group so field-strip can pull them apart.
   const hgG = new THREE.Group(); rec.add(hgG); parts.handguard = hgG;
-  const HGY = 0.42, HA = 0.327, HB = 0.357, HL = 1.68, HX0 = 1.37, THK = 0.022;
+  const HGY = 0.42, HA = 0.327, HB = 0.357, HL = 1.75, HX0 = 1.3, THK = 0.022;   // starts right at the receiver's front face (x 1.3), no gap
   const supPt = (a, b, t)=>{ const c = Math.cos(t), sn = Math.sin(t); return new THREE.Vector2(a*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), b*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2)); };
   const secPt = t=>supPt(HA, HB, t);
   const secN = t=>{ const d = secPt(t + 0.003).sub(secPt(t - 0.003)), n = new THREE.Vector2(d.y, -d.x).normalize(); return n.dot(secPt(t)) < 0 ? n.negate() : n; };
@@ -604,17 +604,12 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     { const pa = step.geometry.attributes.position; for (let i=0;i<pa.count;i++){ const kk = THREE.MathUtils.lerp(1, 0.84, THREE.MathUtils.clamp(pa.getZ(i)/0.12, 0, 1)); pa.setX(i, pa.getX(i)*kk); pa.setY(i, pa.getY(i)*kk); } pa.needsUpdate = true; step.geometry.computeVertexNormals(); }
     half.add(step);
     const collar = extrude(halfSection(0.265, 0.29, t0), 0.45, M.poly, 0.012); collar.rotation.y = Math.PI/2; collar.position.set(3.17, HGY, 0); half.add(collar);   // x 3.17…3.62
-    // raised rim at the back where the handguard slips over the receiver's neck
-    const rim = new THREE.LatheGeometry([[0.3,-0.04],[0.345,-0.04],[0.362,-0.02],[0.362,0.03],[0.34,0.04],[0.3,0.04]].map(([r, y])=>new THREE.Vector2(r, y)), 24, sd > 0 ? -Math.PI/2 : Math.PI/2, Math.PI);
-    at(half, shadowed(new THREE.Mesh(rim, M.poly)), 1.4, HGY, 0).rotation.z = -Math.PI/2;
     // screw through the collar on this side
     at(half, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);
     at(half, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(half, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283);
     if (sd > 0){ at(half, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(half, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0); }   // screw on top of the collar
     parts.hgHalves.push({ g:half, sd });
   });
-  // joint with the receiver (photo): the receiver's nose turns into a round neck that the handguard's back end slips over
-  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.13,-0.09],[0.3,-0.09],[0.31,-0.05],[0.315,0.09],[0.13,0.09],[0.13,-0.09]].map(([r, y])=>new THREE.Vector2(r, y)), 40), M.gun)), 1.31, HGY, 0).rotation.z = -Math.PI/2;
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
   at(rec, cylX(0.06, 2.3, M.gunDark, 16), 2.45, 0.64, 0);                // gas tube (under the handguard)
   // barrel and barrel extension are tubes: through the port you look into the chamber mouth and down the bore to the muzzle
