@@ -310,14 +310,14 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // locked back the empty chamber, the bolt face and the top round in the magazine (the way you check the chamber).
   // The cut goes through the whole profile, so a plate closes it again on the left side.
   const upperShape = shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]);
-  const portHole = new THREE.Path(); { const x0 = 0.1, x1 = 0.95, y0 = 0.22, y1 = 0.64, r = 0.06;
+  const portHole = new THREE.Path(); { const x0 = 0.1, x1 = 1.2, y0 = 0.22, y1 = 0.6, r = 0.06;
     portHole.moveTo(x0 + r, y0); portHole.lineTo(x1 - r, y0); portHole.quadraticCurveTo(x1, y0, x1, y0 + r); portHole.lineTo(x1, y1 - r); portHole.quadraticCurveTo(x1, y1, x1 - r, y1);
     portHole.lineTo(x0 + r, y1); portHole.quadraticCurveTo(x0, y1, x0, y1 - r); portHole.lineTo(x0, y0 + r); portHole.quadraticCurveTo(x0, y0, x0 + r, y0); }
   upperShape.holes.push(portHole);
   rec.add(profile(upperShape, 0.6, M.gun, 0.035));
-  at(rec, box(0.95, 0.5, 0.03, M.gun), 0.525, 0.43, -0.3);                            // left wall over the cut
-  const portIn = new THREE.MeshStandardMaterial({ color:0x0e0f10, roughness:0.7, metalness:0.4, side:THREE.BackSide });
-  at(rec, new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.43, 0.6), portIn), 0.525, 0.43, 0);   // dark inside of the receiver seen through the port
+  // left wall over the cut: receiver colour outside, dark machined steel on the inside you look at through the port
+  at(rec, box(1.2, 0.5, 0.012, M.gun), 0.65, 0.41, -0.296);
+  at(rec, box(1.15, 0.45, 0.004, new THREE.MeshStandardMaterial({ color:0x1a1b1d, roughness:0.55, metalness:0.6 })), 0.65, 0.41, -0.288);
   [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
   [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
   // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
@@ -477,44 +477,52 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     return sh;
   };
   const HGY = 0.42;
-  const hgBody = extrude(hgSection(0.315, 0.345, false), 1.68, M.poly, 0.012); hgBody.rotation.y = Math.PI/2; hgBody.position.set(1.37, HGY, 0); rec.add(hgBody);   // x 1.37…3.05
   // step in toward the collar
-  const hgStep = extrude(hgSection(0.315, 0.345, false), 0.12, M.poly, 0.0); hgStep.rotation.y = Math.PI/2; hgStep.position.set(3.05, HGY, 0);
+  const hgStep = extrude(hgSection(0.327, 0.357, false), 0.12, M.poly, 0.0); hgStep.rotation.y = Math.PI/2; hgStep.position.set(3.05, HGY, 0);
   { const pa = hgStep.geometry.attributes.position; for (let i=0;i<pa.count;i++){ const k = THREE.MathUtils.lerp(1, 0.84, THREE.MathUtils.clamp(pa.getZ(i)/0.12, 0, 1)); pa.setX(i, pa.getX(i)*k); pa.setY(i, pa.getY(i)*k); } pa.needsUpdate = true; hgStep.geometry.computeVertexNormals(); }
   rec.add(hgStep);
   const hgCollar = extrude(hgSection(0.265, 0.29, false), 0.45, M.poly, 0.012); hgCollar.rotation.y = Math.PI/2; hgCollar.position.set(3.17, HGY, 0); rec.add(hgCollar);   // x 3.17…3.62
-  [HGY + 0.347, HGY - 0.347].forEach(y=>at(rec, box(1.8, 0.006, 0.01, M.black), 2.3, y, 0));            // seam between the halves
-  // details on the surface of each half (photos): 4 long grooves with rounded ends pressed into the side, and a row of
-  // 4 oval vent holes along the upper shoulder. Each is a flat stadium laid tangent to the section at angle t.
-  const HA = 0.315, HB = 0.345, secPt = t=>{ const c = Math.cos(t), sn = Math.sin(t);
-    return new THREE.Vector2(HA*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), HB*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2)); };
-  const stadium = (len, w)=>{ const sh = new THREE.Shape(), r = w/2; sh.moveTo(-len/2 + r, -r); sh.lineTo(len/2 - r, -r); sh.absarc(len/2 - r, 0, r, -Math.PI/2, Math.PI/2, false); sh.lineTo(-len/2 + r, r); sh.absarc(-len/2 + r, 0, r, Math.PI/2, Math.PI*1.5, false); return sh; };
-  const grooveM = new THREE.MeshStandardMaterial({ color:0x050506, roughness:0.6, envMapIntensity:0.5 }), rimM = new THREE.MeshStandardMaterial({ color:0x111214, roughness:0.3, envMapIntensity:0.9 });
-  SHELL.push([grooveM, 0.14], [rimM, 0.14]);
-  // lay a flat shape onto the section surface: shape x runs along the handguard, shape y is arc length round the section
-  const onSurface = (sh, x, t, mat, lift)=>{
-    const g = new THREE.ShapeGeometry(sh, 12), pa = g.attributes.position;
-    const sp = secPt(t + 0.005).sub(secPt(t - 0.005)).length()/0.01;               // arc length per unit angle at t
-    for (let i=0;i<pa.count;i++){
-      const tt = t + pa.getY(i)/sp, p = secPt(tt), d = secPt(tt + 0.005).sub(secPt(tt - 0.005));
-      const n = new THREE.Vector2(d.y, -d.x).normalize(); if (n.dot(p) < 0) n.negate();
-      const l = lift + 0.012;                                                       // the extrusion's bevel pushes the skin out 0.012
-      pa.setXYZ(i, x + pa.getX(i), HGY + p.y + n.y*l, -(p.x + n.x*l));
+  // main body (x 1.37…3.05) built as a surface grid so the details are real shape, not decals (photos):
+  // 4 rounded grooves sunk into each side, and one row of 4 oval vents along the top centre
+  const HA = 0.327, HB = 0.357, HL = 1.68, HX0 = 1.37;
+  const secPt = t=>{ const c = Math.cos(t), sn = Math.sin(t); return new THREE.Vector2(HA*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), HB*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2)); };
+  const secN = t=>{ const d = secPt(t + 0.003).sub(secPt(t - 0.003)), n = new THREE.Vector2(d.y, -d.x).normalize(); return n.dot(secPt(t)) < 0 ? n.negate() : n; };
+  // each feature: a capsule (centre line along x at angle t, from x0 to x1, half-width w in arc length) sunk to depth dp
+  const feats = [];
+  [0, Math.PI].forEach(side=>[-0.42, -0.14, 0.14, 0.42].forEach(t=>feats.push({ t:side + t, x0:1.55, x1:2.83, w:0.036, dp:0.02, dark:0.55 })));
+  [1.62, 1.97, 2.32, 2.67].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.065, x1:x + 0.065, w:0.06, dp:0.17, dark:0.02, hole:true }));
+  feats.forEach(f=>{ f.sp = secPt(f.t + 0.003).sub(secPt(f.t - 0.003)).length()/0.006; });
+  const NT = 440, NX = 240, pos = [], col = [], idx = [];
+  for (let j=0;j<=NX;j++){
+    const x = HX0 + HL*j/NX;
+    for (let i=0;i<=NT;i++){
+      const t = i/NT*Math.PI*2, p = secPt(t), n = secN(t);
+      let depth = 0, shade = 1;
+      feats.forEach(f=>{
+        let dt = t - f.t; dt -= Math.round(dt/(Math.PI*2))*Math.PI*2;
+        const s = dt*f.sp; if (Math.abs(s) > f.w*1.4) return;
+        const dx = x < f.x0 ? f.x0 - x : x > f.x1 ? x - f.x1 : 0, d = Math.hypot(dx, s)/f.w;
+        if (d >= 1) return;
+        const k = f.hole ? Math.min(1, (1 - d)*4) : Math.sqrt(1 - d*d);                // vents: steep walls, flat bottom; grooves: round
+        depth = Math.max(depth, f.dp*k); shade = Math.min(shade, THREE.MathUtils.lerp(1, f.dark, Math.min(1, k*1.3)));
+      });
+      pos.push(x, HGY + p.y - n.y*depth, -(p.x - n.x*depth)); col.push(shade, shade, shade);
     }
-    g.computeVertexNormals();
-    const m = new THREE.Mesh(g, mat); m.material.side = THREE.DoubleSide; rec.add(m); return m;
-  };
-  [0, Math.PI].forEach(side=>{
-    [-0.42, -0.14, 0.14, 0.42].forEach(t=>{                                                // grooves: dark floor with a lighter rim
-      onSurface(stadium(1.38, 0.1), 2.18, side + t, rimM, 0.0015);
-      onSurface(stadium(1.34, 0.07), 2.18, side + t, grooveM, 0.003);
-    });
-    [1.62, 1.97, 2.32, 2.67].forEach(x=>{                                                  // vent holes along the top shoulder
-      const t = side === 0 ? 1.3 : Math.PI - 1.3;
-      onSurface(stadium(0.24, 0.085), x, t, rimM, 0.0015);
-      onSurface(stadium(0.22, 0.065), x, t, M.black, 0.003);
-    });
+  }
+  for (let j=0;j<NX;j++) for (let i=0;i<NT;i++){ const a0 = j*(NT + 1) + i, a1 = a0 + NT + 1; idx.push(a0, a1, a0 + 1, a0 + 1, a1, a1 + 1); }
+  const hgGeo = new THREE.BufferGeometry(); hgGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hgGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  hgGeo.setIndex(idx); hgGeo.computeVertexNormals();
+  const hgMat = M.poly.clone(); hgMat.vertexColors = true; hgMat.side = THREE.DoubleSide; SHELL.push([hgMat, 0.14]);
+  rec.add(shadowed(new THREE.Mesh(hgGeo, hgMat)));
+  // the vents go right through: a black floor at the bottom of each one hides the clearcoat sheen and reads as a hole
+  feats.filter(f=>f.hole).forEach(f=>{
+    const w = f.w*0.9, sh = new THREE.Shape(); sh.moveTo(f.x0, -w); sh.lineTo(f.x1, -w); sh.absarc(f.x1, 0, w, -Math.PI/2, Math.PI/2, false); sh.lineTo(f.x0, w); sh.absarc(f.x0, 0, w, Math.PI/2, Math.PI*1.5, false);
+    const fl = new THREE.Mesh(new THREE.ShapeGeometry(sh, 10), M.black); fl.rotation.x = -Math.PI/2; fl.position.y = HGY + HB - f.dp*0.8; rec.add(fl);
   });
+  // back face of the body (the front one is covered by the step)
+  { const sh = new THREE.Shape(); for (let i=0;i<=96;i++){ const p = secPt(i/96*Math.PI*2); i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y); }
+    const cap = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.poly); cap.rotation.y = -Math.PI/2; cap.position.set(HX0, HGY, 0); rec.add(cap); }
+  at(rec, box(HL, 0.006, 0.01, M.black), HX0 + HL/2, HGY - HB - 0.001, 0);                       // seam under the gun between the halves
   [HGY + 0.292, HGY - 0.292].forEach(y=>at(rec, box(0.45, 0.006, 0.01, M.black), 3.4, y, 0));
   at(rec, cylX(0.38, 0.06, M.gunDark, 32), 1.33, HGY, 0);                                              // receiver ring at the back
   [1, -1].forEach(sd=>{ at(rec, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);          // screws through the collar
@@ -646,8 +654,6 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
   const handle = piece('장전손잡이', 0.93, 0.5, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
   at(handle, cylZ(0.028, 0.2, M.gun), 0, 0, -0.08);                                  // stem from the carrier out through the slot
-  at(handle, rbox(0.4, 0.05, 0.022, 0.008, M.gun), 0.17, -0.005, 0.048);             // slide plate
-  at(handle, rbox(0.06, 0.1, 0.022, 0.008, M.gun), 0.36, 0.02, 0.048);               // its stepped front end
   // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
   // the outer end hollowed out into a cup
   const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
@@ -656,6 +662,12 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   knob.rotation.x = Math.PI/2; handle.add(knob);                                     // lathe axis (y) → +z, out from the receiver
   at(handle, cylX(0.009, 0.004, M.black, 10), 0.047, 0, 0.13);                        // cross-pin hole in the waist
   at(handle, cylZ(0.012, 0.004, M.black, 10), 0, 0, 0.182);                          // small hole at the bottom of the cup
+  // right side of the carrier that closes the ejection port while the bolt is forward (photo: with the bolt home the
+  // port shows only the carrier's flank); it slides back with the carrier and uncovers the chamber
+  const flank = new THREE.Group(); carrier.add(flank); parts.carrierFlank = flank;
+  at(flank, rbox(1.12, 0.36, 0.06, 0.02, M.carrier), 0.66, 0.41, 0.255);
+  at(flank, box(0.8, 0.03, 0.01, M.black), 0.6, 0.47, 0.287);                           // groove along the flank
+  at(flank, rbox(0.16, 0.07, 0.01, 0.01, M.black), 1.05, 0.36, 0.287);                    // relief by the extractor
   tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
   // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
@@ -1308,7 +1320,7 @@ document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
-const PORT0 = 0.1, PORT1 = 0.95;     // ejection port span (x)
+const PORT0 = 0.1, PORT1 = 1.2;     // ejection port span (x)
 let hudT = 0;
 function animate(){
   const dt = Math.min(clock.getDelta(), 1/30), t = clock.elapsedTime;
@@ -1349,7 +1361,7 @@ function animate(){
   parts.recoilSpring.scale.y = Math.max(0.3, 2.86 - S.carrier);   // supporter (x -1.06) to the stop inside the op-rod tube (x 1.8 - carrier)
   // bolt strip in the port (opaque mode): the part of the carrier/bolt (x 0.12…1.29) that is behind the port
   const b0 = 0.12 - S.carrier, b1 = 1.29 - S.carrier, lo = Math.max(b0, PORT0), hi = Math.min(b1, PORT1);
-  parts.bolt.visible = false; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
+  parts.bolt.visible = false; parts.carrierFlank.visible = S.ex < 0.05; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
   // whatever is in the chamber is held by the extractor and rides back on the bolt face until it clears the port
   if ((S.chambered || S.spent) && !S.feed && S.carrier > EJECT_AT*TRAVEL){ eject(S.chambered); S.chambered = S.spent = false; renderHud(); }
   // feeding round: waits under the feed lips until the bolt face (x = 1.29 - carrier) catches its rim, then is pushed
