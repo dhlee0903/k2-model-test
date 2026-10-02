@@ -48,7 +48,7 @@ https://archive.org/details/gunmanual_Daewoo_Dr200 (텍스트: https://archive.o
 ## 7-1. 노리쇠멈치 / 노리쇠 후퇴고정
 - 위치·모양: 왼쪽, 탄창 구멍 바로 뒤 윗부분. 위쪽이 홈 파인 넓은 판(paddle), 아래로 긴 레버. AR보다 길다. (사용자 사진, https://www.ar15.com/forums/armory/Daewoo-K2-in-the-family-now--what-do-we-need-to-know-/2-502061/)
 - **마지막 탄을 쏘면 노리쇠가 자동으로 후퇴고정**된다. 빈 탄창의 받침판이 멈치를 밀어 올림 (en.wikipedia K2 / 검색 요약, https://en.wikipedia.org/wiki/Daewoo_Precision_Industries_K2).
-- **손으로 후퇴고정**: 장전손잡이를 끝까지 당긴 채 멈치를 엄지로 **위로 당겨** 건다. AR처럼 아래쪽을 눌러 올리는 단추가 K2에는 **없다**: "you cannot lock the bolt back by pushing the nub at the bottom of the bolt release. It isn't there. You can pull up on the bolt catch and lock the bolt back" — https://thenewrifleman.com/classic-rifle-review-the-daewoo-k2-koreas-answer-to-the-ar15/ . 이걸 보완하는 애프터마켓 부품(아래 단추 추가)도 있음 — https://www.pierceprecisioneng.com/products/p/enhanced-bolt-catch
+- **손으로 후퇴고정**(사용자 확인): 멈치를 몸통에서 **바깥쪽으로 당긴** 채 장전손잡이를 당겼다 놓으면 노리쇠가 뒤에 걸린다. (영문 리뷰의 "pull up"도 이 동작을 말함.) AR처럼 아래쪽을 눌러 올리는 단추가 K2에는 **없다**: "you cannot lock the bolt back by pushing the nub at the bottom of the bolt release. It isn't there. You can pull up on the bolt catch and lock the bolt back" — https://thenewrifleman.com/classic-rifle-review-the-daewoo-k2-koreas-answer-to-the-ar15/ . 이걸 보완하는 애프터마켓 부품(아래 단추 추가)도 있음 — https://www.pierceprecisioneng.com/products/p/enhanced-bolt-catch
 - **해제**: 멈치(위 판)를 누르면 노리쇠가 전진하며 탄을 약실에 넣는다. 장전손잡이를 당겼다 놓아도 풀린다.
 - 군 장전 절차: 노리쇠 당김 → 멈치를 왼손 엄지로 당겨 후퇴고정 → 탄창 결합 → 멈치 눌러 전진·장전. 탄창 끼우고 노리쇠를 끝까지 당겼다 놓는 방식도 된다 — https://m.dcinside.com/board/war/4220260 , https://a-ha.io/questions/4f6f1b63ef4be4dc8d6d3b525e2020ce
 - 구현: 빈 탄창이 꽂혀 있으면 받침판이 멈치를 밀고 있어서 눌러도 안 풀리게 했다(AR과 같은 원리, K2 자료로 직접 확인은 못 함).
