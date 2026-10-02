@@ -609,7 +609,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   [1.66, 2.04, 2.42, 2.8].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.04, x1:x + 0.04, w:0.13, hole:true }));
   feats.forEach(f=>{ f.sp = secPt(f.t + 0.003).sub(secPt(f.t - 0.003)).length()/0.006; });
   const hgMat = M.poly.clone(); hgMat.vertexColors = true; hgMat.side = THREE.DoubleSide; SHELL.push([hgMat, 0.14]);
-  parts.hgHalves = [];
+  parts.hgHalves = []; parts.labels1 = [];
   [[1, Math.PI/2], [-1, -Math.PI/2]].forEach(([sd, t0])=>{                     // sd +1 = right half (z > 0), -1 = left
     const half = new THREE.Group(); half.position.z = sd*0.002; hgG.add(half);
     // main body (x 1.37…3.05): thin shell (outer + inner skin, THK apart) as a surface grid
@@ -663,6 +663,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     at(half, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);
     at(half, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(half, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283);
     if (sd > 0){ at(half, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(half, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0); }   // screw on top of the collar
+    { const lb = tagSprite('덮개'); lb.position.set(2.2, HGY + 0.48, sd*0.3); half.add(lb); parts.labels1.push(lb); }
+    if (sd > 0){ const lb = tagSprite('덮개나사'); lb.position.set(3.45, HGY + 0.55, 0.32); half.add(lb); parts.labels1.push(lb); }
     parts.hgHalves.push({ g:half, sd });
   });
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
@@ -800,7 +802,13 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(bolt, cylY(0.026, 0.135, M.black, 10), -0.15, 0, 0);                            // cam-pin hole
   at(bolt, cylX(0.08, 0.1, M.dsteel, 20), 0.2, 0, 0);                                // head
   for (let k=0;k<8;k++){ if (k === 1) continue; const a = k*Math.PI*2/8; at(bolt, box(0.06, 0.04, 0.036, M.dsteel), 0.258, Math.sin(a)*0.085, Math.cos(a)*0.085).rotation.x = -a; }
-  const ex = at(bolt, box(0.3, 0.03, 0.04, M.steel), 0.13, Math.sin(Math.PI/4)*0.08, Math.cos(Math.PI/4)*0.08); ex.rotation.x = -Math.PI/4;   // extractor
+  // extractor (칼퀴) and its pin (칼퀴멈치못) come off the bolt as their own parts (K-2 분해도 ⑬⑭)
+  { const ey = Math.sin(Math.PI/4)*0.08, ez = Math.cos(Math.PI/4)*0.08;
+    const exP = piece('칼퀴', 1.13, BORE + ey, ez, [1.5, -0.72, 0.45], [0.05, -0.16, 0]);
+    const exB = at(exP, box(0.3, 0.03, 0.04, M.steel), 0, 0, 0); exB.rotation.x = -Math.PI/4;
+    at(exP, box(0.03, 0.022, 0.05, M.steel), 0.145, -0.012, 0.012).rotation.x = -Math.PI/4;   // claw
+    const exPin = piece('칼퀴멈치못', 1.06, BORE + ey, ez, [1.1, -1.0, 0.7], [0.0, -0.14, 0]);
+    at(exPin, cylZ(0.009, 0.16, M.steel, 8), 0, 0, 0).rotation.x = Math.PI/4; }
   at(bolt, cylX(0.05, 0.006, M.black, 18), 0.29, 0, 0);                              // face recess
   at(bolt, cylX(0.01, 0.008, M.steel, 8), 0.292, -0.025, -0.018);                    // ejector
   // firing pin: head just behind the carrier (where the hammer strikes), flange, long shank to the tip at the bolt face
@@ -810,18 +818,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(fpin, cylX(0.036, 0.04, M.steel, 14), -0.38, 0, 0);
   at(fpin, cylX(0.008, 0.04, M.steel, 8), 0.565, 0, 0);
   // cam pin: square head riding in the track on top of the carrier, shank down through the bolt
-  const cpin = piece('캠핀', 0.85, 0.43, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
+  const cpin = piece('노리쇠돌림못', 0.85, 0.43, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
   at(cpin, cylY(0.026, 0.12, M.dsteel, 14), 0, 0, 0);
   at(cpin, rbox(0.07, 0.025, 0.07, 0.008, M.dsteel), 0, 0.065, 0);
   at(cpin, cylZ(0.009, 0.06, M.black, 8), 0, -0.04, 0);                    // hole the firing pin passes through
   // firing-pin retaining pin: cotter pin across the carrier behind the firing pin's flange, head on the left side
-  const rpin = piece('공이고정핀', 0.29, BORE, 0, [-0.7, 0.85, 0], [0, 0.18, 0]);
+  const rpin = piece('공이멈치못', 0.29, BORE, 0, [-0.7, 0.85, 0], [0, 0.18, 0]);
   at(rpin, cylZ(0.01, 0.25, M.steel, 8), 0, 0, 0);
   const loop = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.006, 6, 14), M.steel); at(rpin, shadowed(loop), 0, 0, -0.135);
   // operating-rod tube (silver): mount at the carrier, long tube inside the gas tube, cone, piston rod, ringed piston head
   // operating rod (photos): a separate silver tube resting on the carrier; its rear end narrows to a flat tab with a hook
   // underneath that drops into the oval slot on top of the carrier
-  const rod = piece('작동간', 2.0, 0.64, 0, [0, 0, 0], [0, 0.18, 0], carrier, 1);
+  const rod = piece('가스활대', 2.0, 0.64, 0, [0, 0, 0], [0, 0.18, 0], carrier, 1);
   at(rod, cylX(0.055, 3.25, M.oprod, 20), 0.075, 0, 0);                              // tube x 0.45…3.7
   at(rod, rbox(0.1, 0.12, 0.06, 0.015, M.oprod), -1.58, -0.05, 0);                   // neck down from the tube end
   at(rod, rbox(0.34, 0.025, 0.1, 0.01, M.oprod), -1.76, -0.12, 0);                   // flat tab lying on the carrier
@@ -859,6 +867,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   for (let k=0;k<=9;k++){ const a = A0 + (A1 - A0)*k/9; at(sp, box(0.022, 0.014, 0.15, M.dsteel), LX + Math.cos(a)*(LR + 0.006), LY + Math.sin(a)*(LR + 0.006), 0).rotation.z = a; }   // teeth on the arc
   at(sp, cylZ(0.016, 0.16, M.steel, 12), LX, LY, 0);
   tag(sp, 'latch');
+  { const lb = tagSprite('완충기'); lb.position.set(-0.1, -0.32, 0); sp.add(lb); parts.labels1.push(lb); }
   // field-strip choreography (photos), timed on S.ex 0→1: press the latch, the upper hinges open, the recoil-spring
   // assembly is drawn out of the back, the handle slides to the keyhole and comes out sideways, then the carrier with the
   // operating rod slides out of the back of the upper and everything is laid out above the rifle. [t0, t1, offset]
@@ -987,6 +996,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     inner.add(profile(lug, 0.3, M.gun, 0.015));
   }
   rec.add(upper);
+  { const lb = tagSprite('총열뭉치'); lb.position.set(0.3, 1.3, 0); inner.add(lb); parts.labels1.push(lb);
+    const lb2 = tagSprite('몸통뭉치'); lb2.position.set(-0.6, -0.5, 0.45); rec.add(lb2); parts.labels1.push(lb2);
+    lb.raycast = lb2.raycast = ()=>{}; }
 })();
 
 // magazine contents follow the round count: rounds stacked from the top, follower and spring below
@@ -1463,8 +1475,8 @@ function renderHud(){
   [...selEl.children].forEach((s, i)=>{ s.classList.toggle('on', i === S.selector); s.classList.toggle('safe', i === 0); });
   let t, cls = 'warn';
   if (msgT > 0) t = msg;
-  else if (S.disasm === 1) t = '분해 — 걸쇠 눌러 윗총몸 열고 복좌용수철·장전손잡이·노리쇠뭉치 빼냄 (노리쇠뭉치 클릭/D: 더 분해)';
-  else if (S.disasm === 2) t = '노리쇠뭉치 분해 — D로 조립';
+  else if (S.disasm === 1) t = '분해 — 걸쇠 눌러 총열뭉치를 열고 덮개·복좌용수철·장전손잡이·노리쇠뭉치·가스활대 빼냄 (노리쇠뭉치 클릭/D: 더 분해)';
+  else if (S.disasm === 2) t = '노리쇠뭉치 분해 — 노리쇠·공이·공이멈치못·노리쇠돌림못·칼퀴 (D: 조립)';
   else if (S.held) t = S.mag && S.attached && S.mag.count > 0 ? '노리쇠 후퇴고정 — 노리쇠멈치를 눌러 장전 (C)' : '노리쇠 후퇴고정 — 탄창 교체 (N) 후 노리쇠멈치 (C)';
   else if (!S.chambered && !(S.mag && S.attached)) t = '탄창이 분리돼 있어요 — 탄창 결합 (R)';
   else if (S.spent && !S.cycle) t = '약실에 빈 탄피 — 노리쇠를 당기세요 (F)';
@@ -1710,6 +1722,7 @@ function animate(){
   const level = -tilt;
   parts.carrier.rotation.z = level*stepK(0.86, 1);
   parts.hgHalves.forEach(h=>{ h.g.position.set(0, 0, h.sd*0.002); applySteps(h.g.position, h.steps); });
+  parts.labels1.forEach(lb=>lb.material.opacity = shown*(1 - ease2));          // big-assembly names give way to the carrier parts in stage 2
   parts.explode.forEach(p=>{ if (p.stage === 1 && p.g.parent !== parts.carrier) p.g.rotation.z = level*stepK(p.g === parts.recoilSpring.parent ? 0.5 : 0.6, p.g === parts.recoilSpring.parent ? 0.62 : 0.7); });
   controls.target.y += ((S.disasm ? 0.8 : -0.2) - controls.target.y) * Math.min(1, dt*4);
 
