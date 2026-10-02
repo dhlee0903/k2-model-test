@@ -199,7 +199,9 @@ const M = {
 };
 const SHELL = [[M.gun, 0.16], [M.gunDark, 0.2], [M.poly, 0.14], [M.gripPoly, 0.18], [M.mag, 0.2], [M.rubber, 0.2], [M.grip, 0.3], [M.carrier, 0.38], [M.oprod, 0.4]];
 function setClear(on){
-  SHELL.forEach(([m, o])=>{ m.transparent = on; m.opacity = on ? o : 1; m.depthWrite = !on; m.side = on ? THREE.DoubleSide : THREE.FrontSide; m.needsUpdate = true; });
+  // restore each material's own side when leaving clear view (the handguard grid is DoubleSide, not FrontSide)
+  SHELL.forEach(([m, o])=>{ if (m.userData.side0 === undefined) m.userData.side0 = m.side;
+    m.transparent = on; m.opacity = on ? o : 1; m.depthWrite = !on; m.side = on ? THREE.DoubleSide : m.userData.side0; m.needsUpdate = true; });
   parts.portCover.forEach(o=>o.visible = !on);
 }
 
@@ -483,6 +485,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(sg, cylZ(0.035, 0.42, M.dsteel, 12), -3.75, -0.62, 0);                              // sling pin through the butt
   tag(hinge, 'stock');
   // --- deeply fluted handguard, end caps, exposed gas tube over the barrel ---
+  // everything that belongs to the handguard goes in one group so field-strip can take it off the barrel
+  const hgG = new THREE.Group(); rec.add(hgG); parts.handguard = hgG;
   // handguard (photos): NOT a tube — two moulded halves (left/right) that meet along a seam top and bottom, a squarish
   // rounded section (photo x 1.41…3.18, y 0.05…0.77) with raised ribs running lengthwise down each side, stepping in at
   // the front to a narrower collar where screws hold the halves together
@@ -500,58 +504,66 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // step in toward the collar
   const hgStep = extrude(hgSection(0.327, 0.357, false), 0.12, M.poly, 0.0); hgStep.rotation.y = Math.PI/2; hgStep.position.set(3.05, HGY, 0);
   { const pa = hgStep.geometry.attributes.position; for (let i=0;i<pa.count;i++){ const k = THREE.MathUtils.lerp(1, 0.84, THREE.MathUtils.clamp(pa.getZ(i)/0.12, 0, 1)); pa.setX(i, pa.getX(i)*k); pa.setY(i, pa.getY(i)*k); } pa.needsUpdate = true; hgStep.geometry.computeVertexNormals(); }
-  rec.add(hgStep);
-  const hgCollar = extrude(hgSection(0.265, 0.29, false), 0.45, M.poly, 0.012); hgCollar.rotation.y = Math.PI/2; hgCollar.position.set(3.17, HGY, 0); rec.add(hgCollar);   // x 3.17…3.62
+  hgG.add(hgStep);
+  const hgCollar = extrude(hgSection(0.265, 0.29, false), 0.45, M.poly, 0.012); hgCollar.rotation.y = Math.PI/2; hgCollar.position.set(3.17, HGY, 0); hgG.add(hgCollar);   // x 3.17…3.62
   // joint with the receiver (photo): the receiver's nose turns into a round neck that the handguard's back end slips over,
   // with a raised rim on the handguard where they meet
   at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.0,-0.09],[0.3,-0.09],[0.31,-0.05],[0.315,0.09],[0.0,0.09]].map(([r, y])=>new THREE.Vector2(r, y)), 40), M.gun)), 1.31, HGY, 0).rotation.z = -Math.PI/2;
   const rimS = new THREE.LatheGeometry([[0.3,-0.04],[0.345,-0.04],[0.362,-0.02],[0.362,0.03],[0.34,0.04],[0.3,0.04]].map(([r, y])=>new THREE.Vector2(r, y)), 48);
-  at(rec, shadowed(new THREE.Mesh(rimS, M.poly)), 1.4, HGY, 0).rotation.z = -Math.PI/2;
-  // main body (x 1.37…3.05) built as a surface grid so the details are real shape, not decals (photos):
-  // 4 rounded grooves sunk into each side, and one row of 4 oval vents along the top centre
-  const HA = 0.327, HB = 0.357, HL = 1.68, HX0 = 1.37;
+  at(hgG, shadowed(new THREE.Mesh(rimS, M.poly)), 1.4, HGY, 0).rotation.z = -Math.PI/2;
+  // main body (x 1.37…3.05): a thin moulded shell (outer + inner skin, THK apart) built as a surface grid so the details
+  // are real shape (photos): 4 rounded grooves pressed into each side (the whole wall dents, like a moulding), and one row
+  // of 4 oval vents along the top centre that go right through the wall
+  const HA = 0.327, HB = 0.357, HL = 1.68, HX0 = 1.37, THK = 0.022;
   const secPt = t=>{ const c = Math.cos(t), sn = Math.sin(t); return new THREE.Vector2(HA*Math.sign(c)*Math.pow(Math.abs(c), 2/3.2), HB*Math.sign(sn)*Math.pow(Math.abs(sn), 2/3.2)); };
   const secN = t=>{ const d = secPt(t + 0.003).sub(secPt(t - 0.003)), n = new THREE.Vector2(d.y, -d.x).normalize(); return n.dot(secPt(t)) < 0 ? n.negate() : n; };
-  // each feature: a capsule (centre line along x at angle t, from x0 to x1, half-width w in arc length) sunk to depth dp
-  const feats = [];
-  [0, Math.PI].forEach(side=>[-0.42, -0.14, 0.14, 0.42].forEach(t=>feats.push({ t:side + t, x0:1.55, x1:2.83, w:0.036, dp:0.02, dark:0.55 })));
-  [1.62, 1.97, 2.32, 2.67].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.065, x1:x + 0.065, w:0.06, dp:0.17, dark:0.02, hole:true }));
+  // each feature: a capsule (centre line along x at angle t, from x0 to x1, half-width w in arc length)
+  const feats = [], HOLE_IN = 0.82;
+  [0, Math.PI].forEach(side=>[-0.42, -0.14, 0.14, 0.42].forEach(t=>feats.push({ t:side + t, x0:1.55, x1:2.83, w:0.036, dp:0.018 })));
+  [1.62, 1.97, 2.32, 2.67].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.05, x1:x + 0.05, w:0.095, hole:true }));
   feats.forEach(f=>{ f.sp = secPt(f.t + 0.003).sub(secPt(f.t - 0.003)).length()/0.006; });
-  const NT = 440, NX = 240, pos = [], col = [], idx = [];
-  for (let j=0;j<=NX;j++){
+  const NT = 480, NX = 260, pos = [], col = [], idx = [], holeD = [], NV = (NX + 1)*(NT + 1);
+  for (let skin=0; skin<2; skin++) for (let j=0;j<=NX;j++){
     const x = HX0 + HL*j/NX;
     for (let i=0;i<=NT;i++){
       const t = i/NT*Math.PI*2, p = secPt(t), n = secN(t);
-      let depth = 0, shade = 1;
+      let groove = 0, hd = 9, shade = 1;
       feats.forEach(f=>{
         let dt = t - f.t; dt -= Math.round(dt/(Math.PI*2))*Math.PI*2;
         const s = dt*f.sp; if (Math.abs(s) > f.w*1.4) return;
         const dx = x < f.x0 ? f.x0 - x : x > f.x1 ? x - f.x1 : 0, d = Math.hypot(dx, s)/f.w;
+        if (f.hole){ hd = Math.min(hd, d); return; }
         if (d >= 1) return;
-        const k = f.hole ? Math.min(1, (1 - d)*4) : Math.sqrt(1 - d*d);                // vents: steep walls, flat bottom; grooves: round
-        depth = Math.max(depth, f.dp*k); shade = Math.min(shade, THREE.MathUtils.lerp(1, f.dark, Math.min(1, k*1.3)));
+        const k = Math.sqrt(1 - d*d); groove = Math.max(groove, f.dp*k); shade = Math.min(shade, THREE.MathUtils.lerp(1, 0.55, Math.min(1, k*1.3)));
       });
-      pos.push(x, HGY + p.y - n.y*depth, -(p.x - n.x*depth)); col.push(shade, shade, shade);
+      // outer skin rolls in over a short rounded lip to meet the inner skin at the edge of a vent
+      const lip = hd < 1 ? THK*Math.sin(THREE.MathUtils.clamp((1 - hd)/(1 - HOLE_IN), 0, 1)*Math.PI/2) : 0;
+      const depth = skin ? THK + groove : groove + lip, c = skin ? 0.35 : shade;
+      pos.push(x, HGY + p.y - n.y*depth, -(p.x - n.x*depth)); col.push(c, c, c);
+      if (!skin) holeD.push(hd);
     }
   }
-  for (let j=0;j<NX;j++) for (let i=0;i<NT;i++){ const a0 = j*(NT + 1) + i, a1 = a0 + NT + 1; idx.push(a0, a1, a0 + 1, a0 + 1, a1, a1 + 1); }
+  for (let j=0;j<NX;j++) for (let i=0;i<NT;i++){
+    const a0 = j*(NT + 1) + i, a1 = a0 + NT + 1;
+    if (Math.min(holeD[a0], holeD[a0 + 1], holeD[a1], holeD[a1 + 1]) < HOLE_IN) continue;      // the vent: no wall here
+    idx.push(a0, a1, a0 + 1, a0 + 1, a1, a1 + 1);                                                 // outer skin
+    idx.push(NV + a0, NV + a0 + 1, NV + a1, NV + a0 + 1, NV + a1 + 1, NV + a1);                   // inner skin (faces inward)
+  }
   const hgGeo = new THREE.BufferGeometry(); hgGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hgGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   hgGeo.setIndex(idx); hgGeo.computeVertexNormals();
   const hgMat = M.poly.clone(); hgMat.vertexColors = true; hgMat.side = THREE.DoubleSide; SHELL.push([hgMat, 0.14]);
-  rec.add(shadowed(new THREE.Mesh(hgGeo, hgMat)));
-  // the vents go right through: a black floor at the bottom of each one hides the clearcoat sheen and reads as a hole
-  feats.filter(f=>f.hole).forEach(f=>{
-    const w = f.w*0.9, sh = new THREE.Shape(); sh.moveTo(f.x0, -w); sh.lineTo(f.x1, -w); sh.absarc(f.x1, 0, w, -Math.PI/2, Math.PI/2, false); sh.lineTo(f.x0, w); sh.absarc(f.x0, 0, w, Math.PI/2, Math.PI*1.5, false);
-    const fl = new THREE.Mesh(new THREE.ShapeGeometry(sh, 10), M.black); fl.rotation.x = -Math.PI/2; fl.position.y = HGY + HB - f.dp*0.8; rec.add(fl);
-  });
-  // back face of the body (the front one is covered by the step)
-  { const sh = new THREE.Shape(); for (let i=0;i<=96;i++){ const p = secPt(i/96*Math.PI*2); i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y); }
-    const cap = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.poly); cap.rotation.y = -Math.PI/2; cap.position.set(HX0, HGY, 0); rec.add(cap); }
-  at(rec, box(HL, 0.006, 0.01, M.black), HX0 + HL/2, HGY - HB - 0.001, 0);                       // seam under the gun between the halves
-  [HGY + 0.292, HGY - 0.292].forEach(y=>at(rec, box(0.45, 0.006, 0.01, M.black), 3.4, y, 0));
-  [1, -1].forEach(sd=>{ at(rec, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);          // screws through the collar
-    at(rec, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(rec, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); });
-  at(rec, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(rec, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0);   // screw on top of the collar
+  hgG.add(shadowed(new THREE.Mesh(hgGeo, hgMat)));
+  // back edge of the shell: a thin ring (the front is covered by the step)
+  { const sh = new THREE.Shape(), hole = new THREE.Path();
+    for (let i=0;i<=96;i++){ const t = i/96*Math.PI*2, p = secPt(t), q = p.clone().addScaledVector(secN(t), -THK);
+      i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y); i ? hole.lineTo(q.x, q.y) : hole.moveTo(q.x, q.y); }
+    sh.holes.push(hole);
+    const cap = new THREE.Mesh(new THREE.ShapeGeometry(sh), M.poly); cap.rotation.y = -Math.PI/2; cap.position.set(HX0, HGY, 0); hgG.add(cap); }
+  at(hgG, box(HL, 0.006, 0.01, M.black), HX0 + HL/2, HGY - HB - 0.001, 0);                       // seam under the gun between the halves
+  [HGY + 0.292, HGY - 0.292].forEach(y=>at(hgG, box(0.45, 0.006, 0.01, M.black), 3.4, y, 0));
+  [1, -1].forEach(sd=>{ at(hgG, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);          // screws through the collar
+    at(hgG, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(hgG, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); });
+  at(hgG, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(hgG, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0);   // screw on top of the collar
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
   at(rec, cylX(0.06, 2.3, M.gunDark, 16), 2.45, 0.64, 0);                // gas tube (under the handguard)
   // barrel and barrel extension are tubes: through the port you look into the chamber mouth and down the bore to the muzzle
@@ -723,6 +735,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   entry(handle).steps = [[0.45, 0.53, [-1.49, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.6, 1.2, 0.6]],
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
+  // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
+  parts.HG_STEPS = [[0.3, 0.45, [0, 0, -1.6]], [0.45, 0.62, [0.5, 1.15, -1.2]]];
   parts.CARRIER_STEPS = [[0.62, 0.86, [-6.3, 0, 0]], [0.86, 1, [6.4, 1.3, 0.2]]];
   // hammer on its pin: falls forward onto the firing-pin head, leans back under the carrier when cocked
   const hammer = new THREE.Group(); hammer.position.set(HAM_PIN[0], HAM_PIN[1], 0); rec.add(hammer); parts.hammer = hammer;
@@ -995,16 +1009,17 @@ function eject(live){
   r.position.copy(rec.localToWorld(new THREE.Vector3(1.28 - S.carrier, BORE, 0.25)));
   rec.getWorldQuaternion(r.quaternion); r.rotateZ(-Math.PI/2);
   const q = new THREE.Quaternion(); rec.getWorldQuaternion(q);
-  const v = new THREE.Vector3(-1.2 + Math.random()*0.8, 3 + Math.random()*1.5, 5.5 + Math.random()*1.5).applyQuaternion(q);
+  // thrown up and out to the right, landing a short way from the rifle (a couple of units, not a long arc)
+  const v = new THREE.Vector3(-0.9 + Math.random()*0.6, 2.2 + Math.random()*0.9, 2.4 + Math.random()*1.0).applyQuaternion(q);
   scene.add(r);
-  casings.push({ obj:r, v, w:new THREE.Vector3(Math.random()*20-10, Math.random()*30-15, Math.random()*20-10), life:7, bounces:0 });
-  if (casings.length > 60){ const c = casings.shift(); scene.remove(c.obj); }
+  casings.push({ obj:r, v, w:new THREE.Vector3(Math.random()*20-10, Math.random()*30-15, Math.random()*20-10), bounces:0 });   // no life: cases stay where they land
 }
-function floorY(){ return view === 'range' ? RANGE_GROUND + 0.05 : ground.position.y + 0.05; }
+function floorY(){ return view === 'range' ? RANGE_GROUND + 0.052 : ground.position.y + 0.052; }   // case radius: it lies on the floor
 function updateCasings(dt){
   const fy = floorY();
   for (let i=casings.length-1;i>=0;i--){
     const c = casings[i], o = c.obj;
+    if (c.rest) continue;                                         // lying on the ground: stays there for good
     c.v.y -= 30*dt; o.position.addScaledVector(c.v, dt);
     o.rotation.x += c.w.x*dt; o.rotation.y += c.w.y*dt; o.rotation.z += c.w.z*dt;
     if (o.position.y < fy){
@@ -1013,9 +1028,12 @@ function updateCasings(dt){
       if (sp > 1.5 && c.bounces < 4){ SND.clink(Math.min(1, sp/8)); c.bounces++; }
       c.v.y = -c.v.y*0.35; c.v.x *= 0.6; c.v.z *= 0.6; c.w.multiplyScalar(0.5);
       if (Math.abs(c.v.y) < 0.5){ c.v.y = 0; c.w.multiplyScalar(0.8); }
+      // a case comes to rest lying on its side, pointing any which way
+      if (c.life === undefined && c.v.y === 0 && Math.hypot(c.v.x, c.v.z) < 0.4){
+        c.rest = true; o.quaternion.setFromEuler(new THREE.Euler(0, Math.random()*Math.PI*2, Math.PI/2, 'YXZ')); o.position.y = fy;
+      }
     }
-    c.life -= dt;
-    if (c.life <= 0){ scene.remove(c.obj); casings.splice(i, 1); }
+    if (c.life !== undefined){ c.life -= dt; if (c.life <= 0){ scene.remove(c.obj); casings.splice(i, 1); } }   // only the dropped magazine expires
   }
 }
 
@@ -1472,6 +1490,7 @@ function animate(){
   // pieces that are out of the upper are laid flat: undo the upper's tilt about their own centre as they settle
   const level = -tilt;
   parts.carrier.rotation.z = level*stepK(0.86, 1);
+  parts.handguard.position.set(0, 0, 0); applySteps(parts.handguard.position, parts.HG_STEPS);
   parts.explode.forEach(p=>{ if (p.stage === 1 && p.g.parent !== parts.carrier) p.g.rotation.z = level*stepK(p.g === parts.recoilSpring.parent ? 0.5 : 0.6, p.g === parts.recoilSpring.parent ? 0.62 : 0.7); });
   controls.target.y += ((S.disasm ? 0.8 : -0.2) - controls.target.y) * Math.min(1, dt*4);
 
