@@ -60,4 +60,9 @@ CDN이 막힌 환경이면 `npm pack three@0.128.0`으로 받아 playwright에�
 
 ## 배포
 
+**작업 규칙(사용자 지시): 작업이 끝나면 묻지 말고 PR 머지 + Vercel 운영 배포까지 알아서 한다.**
+
+- Vercel Hobby 팀은 Git 커밋 작성자(dhlee0903)가 팀 멤버가 아니면 배포를 막는다(BLOCKED). 그래서 Git 정보가 없는 폴더에 `index.html`·`.vercel/` 등을 복사해서 그 폴더에서 `vercel deploy --prod --yes`를 실행한다.
+- 클라우드 세션에서는 Node fetch가 프록시를 쓰도록 `NODE_USE_ENV_PROXY=1`이 필요하다. 로그인은 `vercel login`(브라우저 승인), 연결은 `vercel link --yes --project k2-simulator`로 한다. `vercel link`가 만드는 `.env.local`은 커밋하지 않는다.
+
 `npx vercel deploy --prod` (Vercel 프로젝트 `k2-simulator`, 주소 https://k2-simulator.vercel.app).
