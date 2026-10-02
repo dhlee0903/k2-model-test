@@ -722,23 +722,46 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // carrier body (x 0.12…1.12, photos: round like an AR carrier): cylinder on the bore axis, slimmer at the back,
   // windows cut in the sides, curved cam-pin track on top, mount block for the op-rod tube, boss for the charging handle
   const body = piece('노리쇠뭉치', 0.62, BORE, 0, [0, 0, 0], [0, 0.34, 0], carrier, 1);
-  body.scale.set(1, 1, 1.75);                          // wide oval section: with the bolt home its flank fills the ejection port
-  // a black patch on the cylinder surface spanning angle th0±thw (0 = right side, π/2 = top), x c±len/2
-  const cut = (r, c, len, th0, thw)=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10, 1, true, th0 - thw, thw*2), M.black); m.rotation.z = Math.PI/2; m.position.x = c; body.add(m); return m; };
-  at(body, cylX(0.1, 0.34, M.carrier, 32), -0.33, 0, 0);
-  at(body, cylX(0.105, 0.66, M.carrier, 32), 0.17, 0, 0);
-  at(body, cylX(0.108, 0.04, M.carrier, 32), 0.48, 0, 0);                               // front lip
-  cut(0.1062, 0.24, 0.3, 0, 0.42);                                                      // ejection-side window (right)
-  cut(0.1062, -0.02, 0.22, Math.PI, 0.4);                                               // left window
-  cut(0.1062, 0.24, 0.2, Math.PI/2, 0.2);                                               // cam-pin track (top)
-  cut(0.1012, -0.33, 0.04, Math.PI, 0.2);                                               // retaining-pin hole (left)
-  at(body, cylX(0.068, 0.006, M.black, 24), 0.502, 0, 0);                               // bolt bore at the front
-  at(body, cylX(0.03, 0.006, M.black, 12), -0.502, 0, 0);                               // firing-pin hole at the back
-  // top (photo): an oval slot the operating rod's tab hooks into, and a raised lug with a cross hole ahead of it
-  cut(0.1062, -0.24, 0.2, Math.PI/2, 0.32);
-  at(body, rbox(0.12, 0.075, 0.08, 0.015, M.carrier), 0.06, 0.12, 0);
-  at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.125, 0);
-  at(body, rbox(0.12, 0.06, 0.1, 0.02, M.carrier), 0.46, 0.055, 0.08);                  // charging-handle boss at the carrier's front
+  // (photos) a true round AR-type carrier, ~24 mm across: R 0.128 over the front 2/3, a slimmer tail; its underside is
+  // flattened a little where it rides over the top round in the magazine
+  const CR = 0.128, CT = 0.112, CFLAT = -0.1;
+  { const R0 = CR - 0.008, th = Math.asin((CFLAT + 0.008)/R0), sh = new THREE.Shape(), N = 48;   // the bevel adds 0.008 all round
+    for (let i=0;i<=N;i++){ const a = th + (Math.PI - 2*th)*i/N; i ? sh.lineTo(Math.cos(a)*R0, Math.sin(a)*R0) : sh.moveTo(Math.cos(a)*R0, Math.sin(a)*R0); }
+    sh.lineTo(Math.cos(th)*R0, Math.sin(th)*R0);
+    const g = new THREE.ExtrudeGeometry(sh, { depth:0.62, bevelEnabled:true, bevelThickness:0.014, bevelSize:0.008, bevelSegments:3, curveSegments:48 });
+    g.rotateY(Math.PI/2); g.translate(-0.13, 0, 0);                                       // runs x -0.13 … 0.49 (front lip)
+    body.add(shadowed(new THREE.Mesh(g, M.carrier))); }
+  at(body, cylX(CT, 0.36, M.carrier, 40), -0.32, 0, 0);                                    // tail
+  { const ch = new THREE.Mesh(new THREE.CylinderGeometry(CT, CR, 0.03, 40), M.carrier); ch.rotation.z = Math.PI/2; at(body, shadowed(ch), -0.145, 0, 0); }   // shoulder
+  { const ch = new THREE.Mesh(new THREE.CylinderGeometry(CT - 0.014, CT, 0.02, 40), M.carrier); ch.rotation.z = Math.PI/2; at(body, shadowed(ch), -0.51, 0, 0); }  // rear chamfer
+  // recessed slots and windows: a dark stadium bent round the cylinder (angle th0 = centre: 0 right, π/2 top, π left),
+  // optionally slanted (the cam track twists as it runs forward), with a thin bright rim round the cut edge
+  const slot = (r, cx, len, th0, w, twist = 0, rim = true, fill = M.black)=>{
+    const sh = new THREE.Shape(), hw = w/2, hl = len/2;
+    sh.moveTo(-hl + hw, -hw); sh.lineTo(hl - hw, -hw); sh.absarc(hl - hw, 0, hw, -Math.PI/2, Math.PI/2, false); sh.lineTo(-hl + hw, hw); sh.absarc(-hl + hw, 0, hw, Math.PI/2, Math.PI*1.5, false);
+    const wrap = (geo, rr)=>{ const p = geo.attributes.position;
+      for (let i=0;i<p.count;i++){ const u = p.getX(i), v = p.getY(i), a = th0 + (v + twist*u/hl)/rr; p.setXYZ(i, cx + u, Math.sin(a)*rr, Math.cos(a)*rr); }
+      geo.computeVertexNormals(); return geo; };
+    const m = new THREE.Mesh(wrap(new THREE.ShapeGeometry(sh, 12), r + 0.0016), fill); body.add(m);
+    if (rim){ const rs = new THREE.Shape(); rs.moveTo(-hl - 0.008 + hw, -hw - 0.008);
+      rs.lineTo(hl - hw, -hw - 0.008); rs.absarc(hl - hw, 0, hw + 0.008, -Math.PI/2, Math.PI/2, false); rs.lineTo(-hl + hw, hw + 0.008); rs.absarc(-hl + hw, 0, hw + 0.008, Math.PI/2, Math.PI*1.5, false);
+      rs.holes.push(new THREE.Path(sh.getPoints(24).reverse()));
+      body.add(new THREE.Mesh(wrap(new THREE.ShapeGeometry(rs, 12), r + 0.0012), M.steel)); }
+    return m; };
+  slot(CR, 0.26, 0.36, 0.12, 0.13);                                                       // ejection-side cutaway (right, front): the bolt shows in it
+  slot(CR + 0.0008, 0.27, 0.3, 0.12, 0.085, 0, false, M.dsteel);
+  slot(CR, 0.21, 0.26, Math.PI/2 + 0.05, 0.075, 0.035);                                  // cam-pin track on top, slanting as it runs forward
+  slot(CR, -0.02, 0.15, Math.PI - 0.15, 0.06); slot(CR, 0.19, 0.15, Math.PI - 0.15, 0.06);   // two oval vent windows (left)
+  slot(CT, -0.38, 0.05, Math.PI, 0.05, 0, false); slot(CT, -0.38, 0.05, 0, 0.05, 0, false);  // retaining-pin hole through both sides
+  slot(CT, -0.24, 0.2, Math.PI/2, 0.07);                                                  // oval slot on top the op-rod tab hooks into
+  at(body, cylX(0.07, 0.006, M.black, 28), 0.497, 0, 0);                                  // bolt bore at the front
+  { const lip = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.008, 8, 40), M.carrier); lip.rotation.y = Math.PI/2; at(body, shadowed(lip), 0.49, 0, 0); }
+  at(body, cylX(0.03, 0.006, M.black, 14), -0.522, 0, 0);                                 // firing-pin hole at the back
+  [-0.47, -0.43].forEach(x=>{ const g = new THREE.Mesh(new THREE.TorusGeometry(CT, 0.0035, 6, 40), M.black); g.rotation.y = Math.PI/2; at(body, g, x, 0, 0); });   // turned grooves on the tail
+  // top: raised lug with a cross hole ahead of the op-rod slot
+  at(body, rbox(0.12, 0.07, 0.08, 0.015, M.carrier), 0.06, 0.145, 0);
+  at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.15, 0);
+  at(body, rbox(0.12, 0.06, 0.1, 0.02, M.carrier), 0.46, 0.055, 0.125);                 // charging-handle boss at the carrier's front
   // rotating bolt: 7 lugs + extractor at the face (x≈1.29), gas rings on the tail, cam-pin hole
   const bolt = piece('노리쇠', 1.0, BORE, 0, [1.3, -0.3, 0], [0.05, -0.2, 0]);
   at(bolt, cylX(0.04, 0.2, M.dsteel, 16), -0.32, 0, 0);                              // tail
