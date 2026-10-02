@@ -317,18 +317,22 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const UPPER = [[-0.95,0.14],[1.3,0.14],[1.3,0.5],[1.29,0.71,1.06,0.755],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.3]];   // overall side outline (used for bounds)
   // rear block: top piece and the bottom piece on the parting-line diagonal, flat side walls
   [[[-1.25,0.63],[-0.94,0.63],[-0.94,0.77],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]], [[-1.25,0.3],[-0.95,0.14],[-0.94,0.14],[-0.94,0.16],[-0.85,0.16],[-1.25,0.255]]]   // kept below the bore line so you can see right through
-    .forEach(pts=>{ const m = extrude(shape(pts), 0.58, M.gun, 0); m.position.z = -0.29; rec.add(m); });
-  [1, -1].forEach(sd=>{ const w = extrude(shape([[-0.94,0.14],[-0.94,0.77],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.3],[-0.95,0.14]]), 0.04, M.gun, 0.01); w.position.z = sd > 0 ? 0.25 : -0.29; rec.add(w); });
+    .forEach(pts=>{ const m = extrude(shape(pts), 0.54, M.gun, 0); m.position.z = -0.27; rec.add(m); });
+  [1, -1].forEach(sd=>{ const w = extrude(shape([[-0.94,0.14],[-0.94,0.77],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.3],[-0.95,0.14]]), 0.04, M.gun, 0.01); w.position.z = sd > 0 ? 0.23 : -0.27; rec.add(w); });
   const UX0 = -0.95, UX1 = 1.3, UTHK = 0.022;
   const smooth = (x, a, b)=>THREE.MathUtils.smoothstep(x, a, b);
   const uSec = x=>{ const k = smooth(x, -0.35, 0.25);                  // 0 = square rear, 1 = round tube
-    const a = THREE.MathUtils.lerp(0.29, 0.25, k), b = 0.315 + 0.025*smooth(x, 0.6, 1.15), n = THREE.MathUtils.lerp(10, 3.0, k);
+    const a = THREE.MathUtils.lerp(0.28, 0.25, k), b = 0.315 + 0.025*smooth(x, 0.6, 1.15), n = THREE.MathUtils.lerp(24, 3.0, k);
     return { a, b, n, cy:0.14 + b }; };
   const uPt = (x, t, c = uSec(x))=>{ const co = Math.cos(t), si = Math.sin(t);
     return new THREE.Vector3(x, c.cy + c.b*Math.sign(si)*Math.pow(Math.abs(si), 2/c.n), c.a*Math.sign(co)*Math.pow(Math.abs(co), 2/c.n)); };
   parts.uSec = uSec;
   // the right-side opening, in side view (x, y)
-  const inPort = (x, y)=>(x > 0.2 && x < 1.2 && y > 0.31 && y < 0.47) || (x > -0.64 && x <= 0.2 && y > 0.395 && y < 0.47) || (x > -0.64 && x < -0.47 && y > 0.37 && y < 0.5);
+  // rounded rectangle test (corner radius r)
+  const inRR = (x, y, x0, x1, y0, y1, r)=>{ const dx = Math.max(x0 + r - x, 0, x - (x1 - r)), dy = Math.max(y0 + r - y, 0, y - (y1 - r)); return x > x0 && x < x1 && y > y0 && y < y1 && dx*dx + dy*dy < r*r; };
+  // (photo) [ ]-----[            ] : a small rounded window at the rear where the handle comes out, a THIN slot the
+  // handle's thin plate runs in, and the long ejection port in front, just tall enough for a cartridge to come out
+  const inPort = (x, y)=>inRR(x, y, 0.25, 1.2, 0.315, 0.455, 0.035) || inRR(x, y, -0.84, 0.27, 0.42, 0.45, 0.012) || inRR(x, y, -0.94, -0.8, 0.385, 0.485, 0.03);
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
     // would leave the flat sides too coarse to cut a neat slot in); the inner skin is offset inward along the normal
@@ -372,13 +376,21 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // (photos) not a block: the receiver's LEFT and RIGHT side walls themselves rise into a fin each — a long concave sweep up
   // from the front, a rounded crown at the back, and a rear edge leaning back down to the latch. The aperture stands in
   // the open slot between the two fins; the windage drum sits in the right fin
-  const finShape = ()=>shape([[-0.3,0.74],[-0.3,0.77],[-0.4,0.8,-0.48,0.9],[-0.6,1.02,-0.74,1.1],[-0.86,1.16,-0.98,1.14],[-1.08,1.12,-1.11,1.02],[-1.15,0.86],[-1.15,0.74]]);
-  [1, -1].forEach(sd=>{ const fin = profile(finShape(), 0.055, M.gun, 0.018); fin.position.z += sd*0.258; rs.add(fin); });
-  at(rs, rbox(0.34, 0.2, 0.42, 0.02, M.gun), -0.82, 0.86, 0);                          // floor of the slot the aperture stands in
-  at(rs, cylZ(0.115, 0.03, M.gunDark, 32), -0.6, 0.86, 0.3);                        // windage drum, standing just proud of the side
-  at(rs, cylZ(0.09, 0.012, M.dsteel, 32), -0.6, 0.86, 0.318);
-  at(rs, cylZ(0.03, 0.02, M.steel, 16), -0.6, 0.86, 0.322);                          // centre screw
-  for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(rs, cylZ(0.014, 0.016, M.black, 8), -0.6 + Math.cos(a)*0.06, 0.86 + Math.sin(a)*0.06, 0.322); }
+  // (photos) symmetric, like a bowler hat: flares up from both ends and rounds over the top; its outer face continues the
+  // receiver's side (same plane, reaching well down into the body) so the fin and the receiver read as one piece
+  const FXC = -0.75, FHL = 0.47, FY0 = 0.77, FH = 0.37;
+  const finShape = ()=>{ const pts = [[FXC + FHL, 0.765]];
+    for (let i=0;i<=48;i++){ const u = 1 - 2*i/48, f = Math.pow(0.5*(1 + Math.cos(Math.PI*u)), 0.75); pts.push([FXC + u*FHL, FY0 + FH*f]); }
+    pts.push([FXC - FHL, 0.765]); return shape(pts); };
+  // the fin's rounded bottom edge sits in the receiver's top corner; a flat plate (no bevel) below it continues the
+  // side face down so there is no step between fin and receiver
+  [1, -1].forEach(sd=>{ const fin = extrude(finShape(), 0.05, M.gun, 0.008); fin.position.z = sd*(0.2815 - 0.033) - 0.025; rs.add(fin);
+    const fp = new THREE.Mesh(new THREE.ShapeGeometry(shape([[-0.42,0.6],[-0.42,0.8],[-1.12,0.8],[-1.12,0.6]])), M.gun); fp.position.z = sd*0.2812; if (sd < 0) fp.rotation.y = Math.PI, fp.position.x = 0, fp.scale.x = -1; rs.add(fp); });
+  at(rs, rbox(0.34, 0.2, 0.38, 0.02, M.gun), -0.82, 0.86, 0);                          // floor of the slot the aperture stands in
+  at(rs, cylZ(0.115, 0.03, M.gunDark, 32), -0.66, 0.9, 0.29);                        // windage drum, standing just proud of the side
+  at(rs, cylZ(0.09, 0.012, M.dsteel, 32), -0.66, 0.9, 0.308);
+  at(rs, cylZ(0.03, 0.02, M.steel, 16), -0.66, 0.9, 0.312);                          // centre screw
+  for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(rs, cylZ(0.014, 0.016, M.black, 8), -0.66 + Math.cos(a)*0.06, 0.9 + Math.sin(a)*0.06, 0.312); }
   // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
   // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
   const flip = new THREE.Group(); flip.position.set(-0.8, 0.965, 0); rs.add(flip); parts.flip = flip;
@@ -391,28 +403,33 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const leafB = leaf(0.055); const leafBG = new THREE.Group(); leafBG.rotation.z = Math.PI/2; leafBG.add(leafB); flip.add(leafBG);   // larger aperture, lying back
   at(flip, cylZ(0.018, 0.26, M.dsteel, 12), 0, 0, 0);                                 // cross pin
   tag(flip, 'rearsight');
-  at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.62, 0.86, -0.31); at(rs, box(0.07, 0.01, 0.006, M.black), -0.62, 0.86, -0.322);   // left-side screw
+  at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.66, 0.9, -0.29); at(rs, box(0.07, 0.01, 0.006, M.black), -0.66, 0.9, -0.302);   // left-side screw
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
   // parting line between upper and lower (photo): along the top of the lower, stepping up at the back behind the grip
-  [0.32, -0.32].forEach(z=>{ at(rec, box(2.3, 0.008, 0.01, M.black), 0.15, 0.14, z);
+  [0.276, -0.276].forEach(z=>{ at(rec, box(2.3, 0.008, 0.01, M.black), 0.15, 0.14, z);
     const d = at(rec, box(0.34, 0.008, 0.01, M.black), -1.1, 0.22, z); d.rotation.z = -Math.atan2(0.16, 0.3); });
   // the lower's rear corner fills the cut under the upper (it stays with the lower when the upper hinges open)
   const lowerTri = profile(shape([[-1.25,0.14],[-0.95,0.14],[-1.25,0.3]]), 0.6, M.gun, 0.02); rec.add(lowerTri); parts.lowerTri = lowerTri;
   // --- lower receiver: shallow (photo: bottom ≈ y -0.2), flared magwell, takedown pins, magazine release with fence ---
-  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.0],[1.26,-0.14],[1.32,-0.22],[0.06,-0.22],[0.06,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.56, M.gun, 0.035));
-  at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.2, 0);
-  [[-1.02,0.02],[1.12,0.02]].forEach(([x,y])=>at(rec, cylZ(0.05, 0.64, M.dsteel, 16), x, y, 0));
+  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,-0.1],[0.32,-0.3],[0.22,-0.3],[0.22,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.48, M.gun, 0.03));   // half width 0.27, same as the upper
+  [[-1.02,0.02],[1.12,0.02]].forEach(([x,y])=>{ at(rec, cylZ(0.05, 0.56, M.dsteel, 16), x, y, 0); at(rec, cylZ(0.035, 0.57, M.steel, 16), x, y, 0); });   // takedown pins, heads flush
   // fire-control pins (AR layout): trigger pin in front and lower, hammer pin behind and higher
   const TRIG_PIN = [-0.1, -0.1], HAM_PIN = [-0.24, 0.0];
-  [TRIG_PIN, HAM_PIN].forEach(([x,y])=>at(rec, cylZ(0.028, 0.636, M.dsteel, 12), x, y, 0));
-  // magwell side (photos): raised panel over the magwell whose top edge runs right up under the parting line, with a lip;
-  // the magazine release is a round button in a shallow ring at the panel's rear top corner, ahead of the trigger guard
-  rec.add(profile(shape([[0.3,0.11],[1.26,0.11],[1.3,0.06],[1.3,-0.2],[0.3,-0.2],[0.26,-0.16],[0.26,0.07]]), 0.62, M.gun, 0.02));
-  at(rec, rbox(1.02, 0.025, 0.66, 0.01, M.gun), 0.78, 0.115, 0);                              // lip along the top
-  at(rec, cylZ(0.05, 0.02, M.black, 20), 0.36, 0.0, 0.32);                                     // recess
-  at(rec, cylZ(0.042, 0.05, M.dsteel, 20), 0.36, 0.0, 0.33);                                    // magazine release button
-  at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.01, 6, 24), M.gun), 0.36, 0.0, 0.322);
-  [[0.95, -0.04], [0.62, -0.13]].forEach(([x, y])=>at(rec, cylZ(0.016, 0.64, M.black, 10), x, y, 0));   // small pin holes
+  [TRIG_PIN, HAM_PIN].forEach(([x,y])=>at(rec, cylZ(0.028, 0.546, M.dsteel, 12), x, y, 0));
+  // magwell (photos): its bottom edge slants up toward the front, finished with a flared lip; a raised panel over the
+  // magwell's side, the magazine release in a shallow ring at the panel's rear top corner, the maker's marking on the side
+  rec.add(profile(shape([[0.3,0.11],[1.26,0.11],[1.3,0.06],[1.3,-0.1],[0.32,-0.3],[0.26,-0.27],[0.26,0.07]]), 0.5, M.gun, 0.02));
+  { const len = Math.hypot(0.98, 0.2), ang = Math.atan2(0.2, 0.98);
+    const lip = at(rec, rbox(len + 0.04, 0.05, 0.6, 0.02, M.gun), 0.81, -0.215, 0); lip.rotation.z = ang; }          // flared lip along the slant
+  at(rec, rbox(1.02, 0.025, 0.56, 0.01, M.gun), 0.78, 0.115, 0);                              // lip along the top
+  rec.add(profile(shape([[0.46,0.08],[1.2,0.08],[1.2,-0.08],[0.62,-0.2],[0.46,-0.2]]), 0.52, M.gun, 0.012));   // raised panel
+  { const mk = engraved(g=>{ g.font = 'bold 30px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('K2', 128, 22); g.font = 'bold 24px "Malgun Gothic", sans-serif'; g.fillText('DAEWOO PRECISION', 128, 52); }, 256, 72, 0.5, 0.14, false);
+    mk.position.set(0.88, -0.04, 0.2735); rec.add(mk); parts.portCover.push(mk); }
+  at(rec, cylZ(0.05, 0.02, M.black, 20), 0.36, 0.0, 0.27);                                     // recess
+  at(rec, cylZ(0.042, 0.05, M.dsteel, 20), 0.36, 0.0, 0.28);                                    // magazine release button
+  at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.01, 6, 24), M.gun), 0.36, 0.0, 0.272);
+  [[0.95, -0.04], [0.62, -0.13]].forEach(([x, y])=>at(rec, cylZ(0.016, 0.544, M.black, 10), x, y, 0));   // small pin holes
   // trigger guard (photo): thick loop, rear leg down from the grip, flat bottom, front curving up into the magwell
   rec.add(profile(shape([[-0.5,-0.2],[-0.5,-0.47],[-0.5,-0.55,-0.42,-0.55],[0.0,-0.55],[0.2,-0.55,0.26,-0.36],[0.29,-0.2],
     [0.21,-0.2],[0.18,-0.36,0.0,-0.475],[-0.42,-0.475],[-0.43,-0.475,-0.43,-0.45],[-0.43,-0.2]]), 0.16, M.gun, 0.02));
@@ -437,7 +454,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // --- selector (left, photo): pear-shaped lever on its pivot, pointed tip at the selected mark, round thumb knob on the
   // opposite end. Seen from the left the muzzle is to the viewer's left; K2 marks run clockwise from the muzzle side:
   // 안전 (toward the muzzle) → 단발 (up) → 연발 (toward the stock, under the knob on safe) → 점사 (down), all the way round
-  const SX = -0.63, SY = -0.03, LZ = -0.315;            // LZ: left face of the lower receiver
+  const SX = -0.63, SY = -0.03, LZ = -0.27;            // LZ: left face of the lower receiver
   const sel = new THREE.Group(); sel.position.set(SX, SY, LZ); rec.add(sel); parts.selector = sel;
   const lever = new THREE.Shape();
   lever.moveTo(0.085, 0); lever.quadraticCurveTo(0.0, 0.07, -0.11, 0.075);
@@ -486,14 +503,14 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // left side of the upper (photo): small raised pad ahead of the port area, slotted screw on the sight housing
   tag(sel, 'selector');
   // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
-  at(rec, rbox(0.28, 0.86, 0.64, 0.05, M.gun), -1.38, 0.3, 0);
+  at(rec, rbox(0.28, 0.86, 0.56, 0.05, M.gun), -1.38, 0.3, 0);
   // stock hinge (photo): one tall hinge barrel on the right rear, knuckle splits, pin head on top, release latch below
-  at(rec, cylY(0.07, 0.78, M.gunDark, 24), -1.5, 0.3, 0.31);
-  [0.12, 0.3, 0.5].forEach(y=>at(rec, cylY(0.072, 0.008, M.black, 24), -1.5, y, 0.31));
-  at(rec, cylY(0.045, 0.03, M.steel, 16), -1.5, 0.705, 0.31);
-  at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.36);
-  const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.31); rec.add(hinge); parts.stock = hinge;
-  const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.31); hinge.add(sg);
+  at(rec, cylY(0.07, 0.78, M.gunDark, 24), -1.5, 0.3, 0.27);
+  [0.12, 0.3, 0.5].forEach(y=>at(rec, cylY(0.072, 0.008, M.black, 24), -1.5, y, 0.27));
+  at(rec, cylY(0.045, 0.03, M.steel, 16), -1.5, 0.705, 0.27);
+  at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.32);
+  const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.27); rec.add(hinge); parts.stock = hinge;
+  const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.27); hinge.add(sg);
   // photos: top almost level (0.47 at the hinge → 0.57 at the butt); underside sweeps up in a concave curve from the
   // butt's lower corner into a slim, nearly level wrist at the hinge; rounded moulding that is thinner at the wrist
   // than at the butt; butt plate with grooves; metal hinge plate on the front end
@@ -685,6 +702,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // carrier body (x 0.12…1.12, photos: round like an AR carrier): cylinder on the bore axis, slimmer at the back,
   // windows cut in the sides, curved cam-pin track on top, mount block for the op-rod tube, boss for the charging handle
   const body = piece('노리쇠뭉치', 0.62, BORE, 0, [0, 0, 0], [0, 0.34, 0], carrier, 1);
+  body.scale.set(1, 1, 1.75);                          // wide oval section: with the bolt home its flank fills the ejection port
   // a black patch on the cylinder surface spanning angle th0±thw (0 = right side, π/2 = top), x c±len/2
   const cut = (r, c, len, th0, thw)=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10, 1, true, th0 - thw, thw*2), M.black); m.rotation.z = Math.PI/2; m.position.x = c; body.add(m); return m; };
   at(body, cylX(0.1, 0.34, M.carrier, 32), -0.33, 0, 0);
@@ -700,7 +718,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   cut(0.1062, -0.24, 0.2, Math.PI/2, 0.32);
   at(body, rbox(0.12, 0.075, 0.08, 0.015, M.carrier), 0.06, 0.12, 0);
   at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.125, 0);
-  at(body, rbox(0.12, 0.08, 0.1, 0.02, M.carrier), 0.31, 0.05, 0.08);                   // charging-handle boss
+  at(body, rbox(0.12, 0.06, 0.1, 0.02, M.carrier), -0.44, 0.055, 0.08);                 // charging-handle boss at the carrier's rear
   // rotating bolt: 7 lugs + extractor at the face (x≈1.29), gas rings on the tail, cam-pin hole
   const bolt = piece('노리쇠', 1.0, BORE, 0, [1.3, -0.3, 0], [0.05, -0.2, 0]);
   at(bolt, cylX(0.04, 0.2, M.dsteel, 16), -0.32, 0, 0);                              // tail
@@ -740,8 +758,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
   [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
   // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
-  const handle = piece('장전손잡이', 0.93, 0.433, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
-  at(handle, rbox(0.06, 0.1, 0.24, 0.012, M.gunDark), 0, 0, -0.07);                  // flat blade through the slot into the carrier
+  const handle = piece('장전손잡이', 0.18, 0.435, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
+  at(handle, rbox(0.1, 0.022, 0.24, 0.008, M.gunDark), 0, 0, -0.07);                  // thin plate through the slot into the carrier
   // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
   // the outer end hollowed out into a cup
   const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
@@ -774,7 +792,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const entry = g=>parts.explode.find(p=>p.g === g);
   // laid out (photo): op rod on top, carrier below it, handle beside the carrier, spring assembly at the bottom
   entry(sp).steps = [[0, 0.08, [0.05, 0, 0]], [0.28, 0.5, [-3.3, 0, 0]], [0.5, 0.62, [3.4, 0.55, 0.5]]];
-  entry(handle).steps = [[0.45, 0.53, [-1.49, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.6, 1.2, 0.6]],
+  entry(handle).steps = [[0.45, 0.53, [-1.05, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.91, 1.2, 0.6]],
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
   // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
@@ -796,7 +814,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // --- magazine: STANAG 30-round (K2 takes M16 magazines). Straight at the top, curving smoothly forward below the
   // magwell; constant depth MDEP measured square to the walls; pressed ribs along the sides, stop ridge, sliding floorplate ---
   const mag = new THREE.Group(); rec.add(mag); parts.mag = mag;
-  const MDEP = 0.94, MW = 0.3, MY0 = 0.17, MYC = -0.3, MYB = -1.92, MK = 0.11;          // top, start of curve, bottom, curvature
+  const MDEP = 0.82, MW = 0.27, MY0 = 0.17, MYC = -0.3, MYB = -1.92, MK = 0.11;          // top, start of curve, bottom, curvature
   const magRear = y=>0.2 + (y < MYC ? MK*(MYC - y)*(MYC - y) : 0);                         // rear wall x at height y
   const magSlope = y=>y < MYC ? 2*MK*(MYC - y) : 0;                                         // dx per unit drop
   const magN = y=>{ const k = magSlope(y), l = Math.hypot(1, k); return new THREE.Vector2(1/l, k/l); };   // square to the wall, pointing forward
@@ -811,7 +829,6 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     const rib = shadowed(new THREE.Mesh(new THREE.TubeGeometry(ribPath(f), 40, 0.022, 8, false), M.mag)); rib.scale.z = 0.45; rib.position.z = z/0.45*0.45; mag.add(rib);
   }));
   // over-insertion stop: a raised band round the body just under the magwell
-  { const n = magN(-0.3); const band = profile(shape([[magRear(-0.27) - 0.015, -0.27], [magRear(-0.27) + MDEP + 0.015, -0.27], [magRear(-0.35) + n.x*MDEP + 0.015, -0.35 + n.y*MDEP], [magRear(-0.35) - 0.015, -0.35]]), MW + 0.03, M.mag, 0.008); mag.add(band); }
   // floorplate: slides on square to the walls, lips over the front and back, a dimple in the middle of its bottom
   { const yb = MYB, n = magN(yb), ang = Math.atan2(n.y, n.x), cx = magRear(yb) + n.x*MDEP/2, cy = yb + n.y*MDEP/2;
     const fp = new THREE.Group(); fp.position.set(cx, cy, 0); fp.rotation.z = ang; mag.add(fp);
@@ -831,7 +848,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   for (let i=0;i<30;i++){
     const y = MTOP.y - i*STEP, r = makeRound(true);
     r.rotation.z = -Math.PI/2 + Math.atan(magSlope(y));
-    r.position.set(magRear(y) + 0.07, y, i % 2 ? 0.05 : -0.05);
+    r.position.set(magRear(y) + 0.03, y, i % 2 ? 0.05 : -0.05);
     stack.add(r); parts.magRounds.push(r);
   }
   // follower (STANAG): a moulded block with a stepped top — one side raised to start the double stack — and a skirt
