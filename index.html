@@ -307,39 +307,72 @@ const parts = { portCover:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
 
 (function buildRifle(){
-  // --- upper receiver: flat top (photo y 0.77), sloped nose, side ledge ---
-  // hollow upper receiver (photos): side walls, top and bottom rails, front and rear end walls around one long cavity
-  // (x -1.15…1.22, y 0.16…0.66) that holds the carrier group and runs forward to the barrel extension. The right wall
-  // has a single opening: a narrow ejection port at bore height, only a little taller than a cartridge, joined at its top
-  // to the charging-handle slot that runs back toward the rear sight.
-  const UPPER = [[-0.95,0.14],[1.3,0.14],[1.3,0.5],[1.29,0.71,1.06,0.755],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.4]];   // rounded nose; rear bottom cut on the parting-line diagonal (photo)
-  // the middle is C-shaped: top rail, front wall and bottom rail, OPEN AT THE BACK (photos) — the recoil-spring supporter
-  // plugs that opening and latches the upper; with it out, the carrier group slides out of the back of the upper
-  const mid = shape([[-1.25,0.4],[-0.95,0.14],[1.3,0.14],[1.3,0.5],[1.29,0.71,1.06,0.755],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.63],
-    [1.2,0.63],[1.2,0.16],[-0.85,0.16],[-1.2,0.44],[-1.25,0.44]]);
-  const midM = extrude(mid, 0.5, M.gun, 0); midM.position.z = -0.25; rec.add(midM);                    // top/bottom rails + end walls
-  const portSlot = new THREE.Path(); { const r = 0.07;
-    // port y 0.31…0.47 (a round is 0.1 across on the bore line y 0.38), handle slot y 0.395…0.47 behind it
-    // keyhole at the rear end of the handle slot: the handle's blade comes out sideways here (photo)
-    portSlot.moveTo(-0.6, 0.37); portSlot.lineTo(-0.5, 0.37); portSlot.quadraticCurveTo(-0.47, 0.37, -0.47, 0.395); portSlot.lineTo(0.2, 0.395); portSlot.quadraticCurveTo(0.2, 0.31, 0.27, 0.31);
-    portSlot.lineTo(1.14, 0.31); portSlot.quadraticCurveTo(1.2, 0.31, 1.2, 0.37); portSlot.lineTo(1.2, 0.41); portSlot.quadraticCurveTo(1.2, 0.47, 1.14, 0.47);
-    portSlot.lineTo(-0.47, 0.47); portSlot.quadraticCurveTo(-0.47, 0.5, -0.5, 0.5); portSlot.lineTo(-0.6, 0.5); portSlot.quadraticCurveTo(-0.64, 0.5, -0.64, 0.46);
-    portSlot.lineTo(-0.64, 0.41); portSlot.quadraticCurveTo(-0.64, 0.37, -0.6, 0.37); portSlot.closePath(); }
-  const rightW = shape(UPPER); rightW.holes.push(portSlot);
-  const rw = extrude(rightW, 0.04, M.gun, 0.02); rw.position.z = 0.25; rec.add(rw);                  // right wall z 0.25…0.29 (+bevel)
-  const lw = extrude(shape(UPPER), 0.04, M.gun, 0.02); lw.position.z = -0.29; rec.add(lw);          // left wall
-  // dark blued inside of the receiver (only its far faces render, so it never hides the parts inside)
-  const inside = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.46, 0.49), new THREE.MeshStandardMaterial({ color:0x16171a, roughness:0.55, metalness:0.6, side:THREE.BackSide }));
-  inside.position.set(-0.025, 0.395, 0); rec.add(inside); parts.portCover.push(inside);
-  [0.322, -0.322].forEach(z=>at(rec, rbox(2.22, 0.05, 0.03, 0.012, M.gun), 0.085, 0.27, z));
-  [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
+  // --- upper receiver (photos) ---
+  // Behind x = -0.95 a short flat-sided block that is OPEN AT THE BACK (the recoil-spring supporter plugs it and latches
+  // the upper; with it out the carrier group slides out of the back). From there forward the receiver is one thin
+  // moulded shell built as a surface grid: flat-sided and square-shouldered under the rear sight, turning into a
+  // round-topped tube over the chamber and charging handle, rising a little toward the handguard. The right side has one
+  // opening: a narrow ejection port at bore height (a little taller than a cartridge) joined at its top to the
+  // charging-handle slot, with a keyhole at the slot's rear end where the handle comes out.
+  const UPPER = [[-0.95,0.14],[1.3,0.14],[1.3,0.5],[1.29,0.71,1.06,0.755],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.3]];   // overall side outline (used for bounds)
+  // rear block: top piece and the bottom piece on the parting-line diagonal, flat side walls
+  [[[-1.25,0.63],[-0.94,0.63],[-0.94,0.77],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]], [[-1.25,0.3],[-0.95,0.14],[-0.94,0.14],[-0.94,0.16],[-0.85,0.16],[-1.25,0.255]]]   // kept below the bore line so you can see right through
+    .forEach(pts=>{ const m = extrude(shape(pts), 0.58, M.gun, 0); m.position.z = -0.29; rec.add(m); });
+  [1, -1].forEach(sd=>{ const w = extrude(shape([[-0.94,0.14],[-0.94,0.77],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66],[-1.25,0.3],[-0.95,0.14]]), 0.04, M.gun, 0.01); w.position.z = sd > 0 ? 0.25 : -0.29; rec.add(w); });
+  const UX0 = -0.95, UX1 = 1.3, UTHK = 0.022;
+  const smooth = (x, a, b)=>THREE.MathUtils.smoothstep(x, a, b);
+  const uSec = x=>{ const k = smooth(x, -0.35, 0.25);                  // 0 = square rear, 1 = round tube
+    const a = THREE.MathUtils.lerp(0.29, 0.25, k), b = 0.315 + 0.025*smooth(x, 0.6, 1.15), n = THREE.MathUtils.lerp(10, 3.0, k);
+    return { a, b, n, cy:0.14 + b }; };
+  const uPt = (x, t, c = uSec(x))=>{ const co = Math.cos(t), si = Math.sin(t);
+    return new THREE.Vector3(x, c.cy + c.b*Math.sign(si)*Math.pow(Math.abs(si), 2/c.n), c.a*Math.sign(co)*Math.pow(Math.abs(co), 2/c.n)); };
+  parts.uSec = uSec;
+  // the right-side opening, in side view (x, y)
+  const inPort = (x, y)=>(x > 0.2 && x < 1.2 && y > 0.31 && y < 0.47) || (x > -0.64 && x <= 0.2 && y > 0.395 && y < 0.47) || (x > -0.64 && x < -0.47 && y > 0.37 && y < 0.5);
+  { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
+    // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
+    // would leave the flat sides too coarse to cut a neat slot in); the inner skin is offset inward along the normal
+    const ring = x=>{ const c = uSec(x), D = 1440, d = [], L = [0];
+      for (let i=0;i<=D;i++){ d.push(uPt(x, i/D*Math.PI*2, c)); if (i) L.push(L[i - 1] + d[i].distanceTo(d[i - 1])); }
+      const out = []; let k = 0;
+      for (let i=0;i<=NT;i++){ const want = L[D]*i/NT; while (k < D - 1 && L[k + 1] < want) k++; const f = (want - L[k])/Math.max(1e-9, L[k + 1] - L[k]); out.push(d[k].clone().lerp(d[k + 1], f)); }
+      return out; };
+    const rings = []; for (let j=0;j<=NX;j++) rings.push(ring(UX0 + (UX1 - UX0)*j/NX));
+    for (let skin=0; skin<2; skin++) for (let j=0;j<=NX;j++){
+      const r = rings[j], cy = uSec(r[0].x).cy;
+      for (let i=0;i<=NT;i++){
+        const p = r[i];
+        if (skin){ const a = r[(i + NT - 1) % NT], b = r[(i + 1) % NT], ty = b.y - a.y, tz = b.z - a.z, l = Math.hypot(ty, tz) || 1;
+          let ny = tz/l, nz = -ty/l; if (ny*(p.y - cy) + nz*p.z < 0){ ny = -ny; nz = -nz; }
+          pos.push(p.x, p.y - ny*UTHK, p.z - nz*UTHK); col.push(0.18, 0.18, 0.18); }
+        else { pos.push(p.x, p.y, p.z); col.push(1, 1, 1); cut.push(p.z > 0.1 && inPort(p.x, p.y)); }
+      }
+    }
+    const open = (...v)=>v.some(i=>cut[i]);
+    for (let j=0;j<NX;j++) for (let i=0;i<NT;i++){
+      const a0 = j*(NT + 1) + i, a1 = a0 + NT + 1;
+      if (open(a0, a0 + 1, a1, a1 + 1)) continue;
+      idx.push(a0, a0 + 1, a1, a0 + 1, a1 + 1, a1);                                                  // outer skin
+      idx.push(NV + a0, NV + a1, NV + a0 + 1, NV + a0 + 1, NV + a1, NV + a1 + 1);                    // inner skin
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    const uMat = M.gun.clone(); uMat.vertexColors = true; uMat.side = THREE.DoubleSide; SHELL.push([uMat, 0.16]);
+    rec.add(shadowed(new THREE.Mesh(geo, uMat)));
+    // front wall of the receiver: the section outline with holes for the barrel extension and the operating rod
+    const fc = uSec(UX1), fs = new THREE.Shape();
+    for (let i=0;i<=96;i++){ const p = uPt(UX1, i/96*Math.PI*2, fc); i ? fs.lineTo(-p.z, p.y) : fs.moveTo(-p.z, p.y); }
+    [[BORE, 0.125], [0.64, 0.07]].forEach(([y, r])=>{ const h = new THREE.Path(); h.absarc(0, y, r, 0, Math.PI*2, true); fs.holes.push(h); });
+    const fw = extrude(fs, 0.03, M.gun, 0); fw.rotation.y = Math.PI/2; fw.position.x = UX1 - 0.03; rec.add(fw); }
+  // scope-mount screw on the top at the front, where the receiver rises toward the handguard
+  { const c = uSec(1.08); at(rec, cylY(0.065, 0.04, M.gun, 20), 1.08, c.cy + c.b + 0.005, 0); at(rec, cylY(0.04, 0.03, M.dsteel, 16), 1.08, c.cy + c.b + 0.035, 0); at(rec, box(0.06, 0.008, 0.012, M.black), 1.08, c.cy + c.b + 0.051, 0); }
   // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
   // windage drum with spanner holes on its right side, L-shaped flip aperture (two leaves at 90°) on top at the rear
   const rs = new THREE.Group(); rec.add(rs); parts.rearSight = rs;
   // (photos) not a block: the receiver's LEFT and RIGHT side walls themselves rise into a fin each — a long concave sweep up
   // from the front, a rounded crown at the back, and a rear edge leaning back down to the latch. The aperture stands in
   // the open slot between the two fins; the windage drum sits in the right fin
-  const finShape = ()=>shape([[0.08,0.74],[0.08,0.77],[-0.22,0.785,-0.42,0.9],[-0.6,1.02,-0.74,1.1],[-0.86,1.16,-0.98,1.14],[-1.08,1.12,-1.11,1.02],[-1.15,0.86],[-1.15,0.74]]);
+  const finShape = ()=>shape([[-0.3,0.74],[-0.3,0.77],[-0.4,0.8,-0.48,0.9],[-0.6,1.02,-0.74,1.1],[-0.86,1.16,-0.98,1.14],[-1.08,1.12,-1.11,1.02],[-1.15,0.86],[-1.15,0.74]]);
   [1, -1].forEach(sd=>{ const fin = profile(finShape(), 0.055, M.gun, 0.018); fin.position.z += sd*0.258; rs.add(fin); });
   at(rs, rbox(0.34, 0.2, 0.42, 0.02, M.gun), -0.82, 0.86, 0);                          // floor of the slot the aperture stands in
   at(rs, cylZ(0.115, 0.03, M.gunDark, 32), -0.6, 0.86, 0.3);                        // windage drum, standing just proud of the side
@@ -362,15 +395,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
   // parting line between upper and lower (photo): along the top of the lower, stepping up at the back behind the grip
   [0.32, -0.32].forEach(z=>{ at(rec, box(2.3, 0.008, 0.01, M.black), 0.15, 0.14, z);
-    const d = at(rec, box(0.4, 0.008, 0.01, M.black), -1.1, 0.27, z); d.rotation.z = -Math.atan2(0.26, 0.3); });
+    const d = at(rec, box(0.34, 0.008, 0.01, M.black), -1.1, 0.22, z); d.rotation.z = -Math.atan2(0.16, 0.3); });
   // the lower's rear corner fills the cut under the upper (it stays with the lower when the upper hinges open)
-  const lowerTri = profile(shape([[-1.25,0.14],[-0.95,0.14],[-1.25,0.4]]), 0.6, M.gun, 0.02); rec.add(lowerTri); parts.lowerTri = lowerTri;
-  const hole = at(rec, rbox(0.42, 0.05, 0.02, 0.02, M.black), -0.4, 0.26, 0.335);       // the elongated hole low on the right of the upper
-  parts.portCover.push(hole);
-  // scope-mount bolt on top of the upper at the front: raised boss with a bolt in it
-  at(rec, cylY(0.07, 0.05, M.gun, 20), 1.0, 0.785, 0);
-  at(rec, cylY(0.04, 0.03, M.dsteel, 16), 1.0, 0.82, 0);
-  at(rec, box(0.06, 0.008, 0.012, M.black), 1.0, 0.836, 0);
+  const lowerTri = profile(shape([[-1.25,0.14],[-0.95,0.14],[-1.25,0.3]]), 0.6, M.gun, 0.02); rec.add(lowerTri); parts.lowerTri = lowerTri;
   // --- lower receiver: shallow (photo: bottom ≈ y -0.2), flared magwell, takedown pins, magazine release with fence ---
   rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.0],[1.26,-0.14],[1.32,-0.22],[0.06,-0.22],[0.06,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.56, M.gun, 0.035));
   at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.2, 0);
@@ -457,7 +484,6 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   loopS.holes.push(loopH);
   const sling = extrude(loopS, 0.018, M.dsteel, 0.006); sling.position.set(-1.17, 0.02, LZ - 0.075); sling.rotation.z = -0.35; rec.add(sling);
   // left side of the upper (photo): small raised pad ahead of the port area, slotted screw on the sight housing
-  at(rec, rbox(0.3, 0.12, 0.03, 0.02, M.gun), 0.85, 0.6, -0.33);
   tag(sel, 'selector');
   // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
   at(rec, rbox(0.28, 0.86, 0.64, 0.05, M.gun), -1.38, 0.3, 0);
@@ -499,7 +525,11 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const secPt = t=>supPt(HA, HB, t);
   const secN = t=>{ const d = secPt(t + 0.003).sub(secPt(t - 0.003)), n = new THREE.Vector2(d.y, -d.x).normalize(); return n.dot(secPt(t)) < 0 ? n.negate() : n; };
   // half of a section, closed along the vertical centre line (shape x maps to world -z once turned to run along the barrel)
-  const halfSection = (a, b, t0)=>{ const sh = new THREE.Shape(); for (let i=0;i<=80;i++){ const p = supPt(a, b, t0 + Math.PI*i/80); i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y); } sh.closePath(); return sh; };
+  // ...with notches round the barrel (centre -0.04) and the gas tube (centre +0.22) so nothing blocks the bore
+  const halfSection = (a, b, t0)=>{ const sh = new THREE.Shape(); for (let i=0;i<=80;i++){ const p = supPt(a, b, t0 + Math.PI*i/80); i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y); }
+    if (Math.sin(t0) > 0){ sh.lineTo(0, -0.14); sh.absarc(0, -0.04, 0.1, -Math.PI/2, -Math.PI*1.5, true); sh.lineTo(0, 0.15); sh.absarc(0, 0.22, 0.07, -Math.PI/2, -Math.PI*1.5, true); }
+    else { sh.lineTo(0, 0.29); sh.absarc(0, 0.22, 0.07, Math.PI/2, -Math.PI/2, true); sh.lineTo(0, 0.06); sh.absarc(0, -0.04, 0.1, Math.PI/2, -Math.PI/2, true); }
+    sh.closePath(); return sh; };
   // surface features: grooves pressed into each side (the whole wall dents), and 4 large oval vents on top that sit on the
   // seam, so each half carries one half of every vent
   const feats = [], HOLE_IN = 0.82;
@@ -567,7 +597,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     parts.hgHalves.push({ g:half, sd });
   });
   // joint with the receiver (photo): the receiver's nose turns into a round neck that the handguard's back end slips over
-  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.0,-0.09],[0.3,-0.09],[0.31,-0.05],[0.315,0.09],[0.0,0.09]].map(([r, y])=>new THREE.Vector2(r, y)), 40), M.gun)), 1.31, HGY, 0).rotation.z = -Math.PI/2;
+  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.13,-0.09],[0.3,-0.09],[0.31,-0.05],[0.315,0.09],[0.13,0.09],[0.13,-0.09]].map(([r, y])=>new THREE.Vector2(r, y)), 40), M.gun)), 1.31, HGY, 0).rotation.z = -Math.PI/2;
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
   at(rec, cylX(0.06, 2.3, M.gunDark, 16), 2.45, 0.64, 0);                // gas tube (under the handguard)
   // barrel and barrel extension are tubes: through the port you look into the chamber mouth and down the bore to the muzzle
@@ -584,7 +614,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.06, 0.04, 24, 1, true), M.bore); funnel.rotation.z = Math.PI/2; funnel.position.set(1.3, BORE, 0); rec.add(funnel);
   for (let k=0;k<8;k++){ if (k === 1) continue; const a = k*Math.PI*2/8 + Math.PI/8; at(rec, box(0.17, 0.03, 0.03, M.black), 1.19, BORE + Math.sin(a)*0.085, Math.cos(a)*0.085).rotation.x = -a; }
   // --- gas block + ringed front sight + sling swivel + bayonet lug ---
-  at(rec, rbox(0.34, 0.44, 0.26, 0.04, M.gunDark), 4.97, 0.5, 0);
+  // gas block: wraps round the barrel (a bore-sized hole through it, not a solid block across the bore)
+  { const gb = new THREE.Shape(); gb.moveTo(-0.13, 0.28); gb.lineTo(0.13, 0.28); gb.lineTo(0.13, 0.72); gb.lineTo(-0.13, 0.72); gb.closePath();
+    const h = new THREE.Path(); h.absarc(0, BORE, 0.081, 0, Math.PI*2, true); gb.holes.push(h);
+    const m = extrude(gb, 0.3, M.gunDark, 0.02); m.rotation.y = Math.PI/2; m.position.x = 4.82; rec.add(m); }
   // front sight + gas regulator (close-up photos, DR200 manual Fig. 5). The sight is one flat-fronted "keyhole" piece on
   // the front of the gas block: thick ring on top, neck tapering down to a boss round the regulator, a yellow arrow painted
   // on its face pointing down at the regulator. The post is a blade standing in a notch at the bottom of the ring.
@@ -620,7 +653,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const dFace = new THREE.Mesh(new THREE.CircleGeometry(0.026, 20), new THREE.MeshStandardMaterial({ color:0x3a3d40, roughness:0.6, metalness:0.6, bumpMap:gripBump, bumpScale:0.01 })); at(detent, dFace, 0, 0, 0.0455);
   tag(gas, 'gas'); tag(detent, 'gas');
   // front sling swivel (photo): band clamped round the barrel, lug under it, D-ring hanging from the swivel pin
-  at(rec, cylX(0.1, 0.08, M.gunDark, 24), 4.62, BORE, 0);
+  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.081,-0.04],[0.1,-0.04],[0.1,0.04],[0.081,0.04],[0.081,-0.04]].map(([r, y])=>new THREE.Vector2(r, y)), 24), M.gunDark)), 4.62, BORE, 0).rotation.z = Math.PI/2;   // band round the barrel
   at(rec, rbox(0.08, 0.08, 0.07, 0.015, M.gunDark), 4.62, 0.26, 0);
   at(rec, cylZ(0.015, 0.1, M.steel, 10), 4.62, 0.24, 0);
   const dring = new THREE.Shape(); dring.moveTo(-0.07, 0.0); dring.lineTo(0.07, 0.0); dring.quadraticCurveTo(0.07, -0.16, 0, -0.16); dring.quadraticCurveTo(-0.07, -0.16, -0.07, 0.0);
@@ -634,7 +667,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const fhIn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.75, 24, 1, true), M.bore); fhIn.rotation.z = Math.PI/2; at(rec, fhIn, 6.79, BORE, 0);
   const lip = shadowed(new THREE.Mesh(new THREE.RingGeometry(0.06, 0.1, 28), M.gunDark)); lip.rotation.y = Math.PI/2; at(rec, lip, 7.165, BORE, 0);
   const crown = new THREE.Mesh(new THREE.RingGeometry(0.033, 0.06, 24), M.bore); crown.rotation.y = -Math.PI/2; at(rec, crown, 6.42, BORE, 0);
-  at(rec, cylX(0.11, 0.05, M.gunDark, 28), 6.42, BORE, 0);
+  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.033,-0.025],[0.11,-0.025],[0.11,0.025],[0.033,0.025],[0.033,-0.025]].map(([r, y])=>new THREE.Vector2(r, y)), 28), M.gunDark)), 6.42, BORE, 0).rotation.z = Math.PI/2;
   for (let k=0;k<5;k++){ const a = k*Math.PI*2/5 + 0.3; at(rec, box(0.45, 0.025, 0.02, M.black), 6.86, BORE + Math.sin(a)*0.1, Math.cos(a)*0.1).rotation.x = a; }
   parts.muzzle = at(rec, new THREE.Object3D(), 7.17, BORE, 0);
 
