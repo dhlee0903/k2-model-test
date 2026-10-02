@@ -306,18 +306,24 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
 
 (function buildRifle(){
   // --- upper receiver: flat top (photo y 0.77), sloped nose, side ledge ---
-  // the ejection port is a real opening (x 0.1…0.95, y 0.22…0.64): through it you see the carrier, and with the bolt
-  // locked back the empty chamber, the bolt face and the top round in the magazine (the way you check the chamber).
-  // The cut goes through the whole profile, so a plate closes it again on the left side.
-  const upperShape = shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]);
-  const portHole = new THREE.Path(); { const x0 = 0.1, x1 = 1.2, y0 = 0.22, y1 = 0.6, r = 0.06;
-    portHole.moveTo(x0 + r, y0); portHole.lineTo(x1 - r, y0); portHole.quadraticCurveTo(x1, y0, x1, y0 + r); portHole.lineTo(x1, y1 - r); portHole.quadraticCurveTo(x1, y1, x1 - r, y1);
-    portHole.lineTo(x0 + r, y1); portHole.quadraticCurveTo(x0, y1, x0, y1 - r); portHole.lineTo(x0, y0 + r); portHole.quadraticCurveTo(x0, y0, x0 + r, y0); }
-  upperShape.holes.push(portHole);
-  rec.add(profile(upperShape, 0.6, M.gun, 0.035));
-  // left wall over the cut: receiver colour outside, dark machined steel on the inside you look at through the port
-  at(rec, box(1.2, 0.5, 0.012, M.gun), 0.65, 0.41, -0.296);
-  at(rec, box(1.15, 0.45, 0.004, new THREE.MeshStandardMaterial({ color:0x1a1b1d, roughness:0.55, metalness:0.6 })), 0.65, 0.41, -0.288);
+  // hollow upper receiver (photos): side walls, top and bottom rails, front and rear end walls around one long cavity
+  // (x -1.15…1.22, y 0.16…0.66) that holds the carrier group and runs forward to the barrel extension. The right wall
+  // has a single opening: a narrow ejection port at bore height, only a little taller than a cartridge, joined at its top
+  // to the charging-handle slot that runs back toward the rear sight.
+  const UPPER = [[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]];
+  const cavity = ()=>{ const h = new THREE.Path(); h.moveTo(-1.15, 0.16); h.lineTo(1.26, 0.16); h.lineTo(1.26, 0.66); h.lineTo(-1.15, 0.66); h.closePath(); return h; };   // kept clear of the outline so it triangulates
+  const mid = shape(UPPER); mid.holes.push(cavity());
+  const midM = extrude(mid, 0.5, M.gun, 0); midM.position.z = -0.25; rec.add(midM);                    // top/bottom rails + end walls
+  const portSlot = new THREE.Path(); { const r = 0.07;
+    portSlot.moveTo(-0.62, 0.465); portSlot.lineTo(0.18, 0.465); portSlot.lineTo(0.18, 0.34); portSlot.quadraticCurveTo(0.18, 0.27, 0.25, 0.27);
+    portSlot.lineTo(1.13, 0.27); portSlot.quadraticCurveTo(1.2, 0.27, 1.2, 0.34); portSlot.lineTo(1.2, 0.47); portSlot.quadraticCurveTo(1.2, 0.535, 1.13, 0.535);
+    portSlot.lineTo(-0.59, 0.535); portSlot.quadraticCurveTo(-0.62, 0.535, -0.62, 0.5); portSlot.closePath(); }
+  const rightW = shape(UPPER); rightW.holes.push(portSlot);
+  const rw = extrude(rightW, 0.04, M.gun, 0.02); rw.position.z = 0.25; rec.add(rw);                  // right wall z 0.25…0.29 (+bevel)
+  const lw = extrude(shape(UPPER), 0.04, M.gun, 0.02); lw.position.z = -0.29; rec.add(lw);          // left wall
+  // dark blued inside of the receiver (only its far faces render, so it never hides the parts inside)
+  const inside = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.52, 0.49), new THREE.MeshStandardMaterial({ color:0x16171a, roughness:0.55, metalness:0.6, side:THREE.BackSide }));
+  inside.position.set(0.07, 0.41, 0); rec.add(inside); parts.portCover.push(inside);
   [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
   [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
   // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
@@ -342,9 +348,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   tag(flip, 'rearsight');
   at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.62, 0.86, -0.225); at(rs, box(0.07, 0.01, 0.006, M.black), -0.62, 0.86, -0.237);   // left-side screw
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
-  const slot = at(rec, box(0.66, 0.05, 0.02, M.black), -0.23, 0.5, 0.335);            // charging-handle slot behind the port
   const hole = at(rec, rbox(0.42, 0.05, 0.02, 0.02, M.black), -0.4, 0.26, 0.335);       // the elongated hole low on the right of the upper
-  parts.portCover.push(slot, hole);
+  parts.portCover.push(hole);
   // scope-mount bolt on top of the upper at the front: raised boss with a bolt in it
   at(rec, cylY(0.07, 0.05, M.gun, 20), 1.0, 0.785, 0);
   at(rec, cylY(0.04, 0.03, M.dsteel, 16), 1.0, 0.82, 0);
@@ -662,12 +667,6 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   knob.rotation.x = Math.PI/2; handle.add(knob);                                     // lathe axis (y) → +z, out from the receiver
   at(handle, cylX(0.009, 0.004, M.black, 10), 0.047, 0, 0.13);                        // cross-pin hole in the waist
   at(handle, cylZ(0.012, 0.004, M.black, 10), 0, 0, 0.182);                          // small hole at the bottom of the cup
-  // right side of the carrier that closes the ejection port while the bolt is forward (photo: with the bolt home the
-  // port shows only the carrier's flank); it slides back with the carrier and uncovers the chamber
-  const flank = new THREE.Group(); carrier.add(flank); parts.carrierFlank = flank;
-  at(flank, rbox(1.12, 0.36, 0.06, 0.02, M.carrier), 0.66, 0.41, 0.255);
-  at(flank, box(0.8, 0.03, 0.01, M.black), 0.6, 0.47, 0.287);                           // groove along the flank
-  at(flank, rbox(0.16, 0.07, 0.01, 0.01, M.black), 1.05, 0.36, 0.287);                    // relief by the extractor
   tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
   // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
@@ -1320,7 +1319,7 @@ document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
-const PORT0 = 0.1, PORT1 = 1.2;     // ejection port span (x)
+const PORT0 = 0.18, PORT1 = 1.2;     // ejection port span (x)
 let hudT = 0;
 function animate(){
   const dt = Math.min(clock.getDelta(), 1/30), t = clock.elapsedTime;
@@ -1361,7 +1360,7 @@ function animate(){
   parts.recoilSpring.scale.y = Math.max(0.3, 2.86 - S.carrier);   // supporter (x -1.06) to the stop inside the op-rod tube (x 1.8 - carrier)
   // bolt strip in the port (opaque mode): the part of the carrier/bolt (x 0.12…1.29) that is behind the port
   const b0 = 0.12 - S.carrier, b1 = 1.29 - S.carrier, lo = Math.max(b0, PORT0), hi = Math.min(b1, PORT1);
-  parts.bolt.visible = false; parts.carrierFlank.visible = S.ex < 0.05; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
+  parts.bolt.visible = false; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
   // whatever is in the chamber is held by the extractor and rides back on the bolt face until it clears the port
   if ((S.chambered || S.spent) && !S.feed && S.carrier > EJECT_AT*TRAVEL){ eject(S.chambered); S.chambered = S.spent = false; renderHud(); }
   // feeding round: waits under the feed lips until the bolt face (x = 1.29 - carrier) catches its rim, then is pushed
