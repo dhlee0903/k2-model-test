@@ -184,7 +184,8 @@ const M = {
   mag:    new THREE.MeshStandardMaterial({ color:0x262829, map:parkMap, bumpMap:parkBump, bumpScale:0.0014, roughness:0.45, metalness:0.65, envMapIntensity:0.95 }),
   rubber: new THREE.MeshStandardMaterial({ color:0x0c0c0d, roughness:0.9, bumpMap:polyBump, bumpScale:0.006 }),
   steel:  new THREE.MeshStandardMaterial({ color:0xa7adb5, roughness:0.25, metalness:1, envMapIntensity:1.2 }),
-  carrier:new THREE.MeshStandardMaterial({ color:0x9aa0a8, roughness:0.3, metalness:1, envMapIntensity:1.2 }),   // carrier body: half see-through in clear mode so the firing pin shows
+  carrier:new THREE.MeshStandardMaterial({ color:0x2e3134, map:parkMap, roughness:0.38, metalness:0.75, envMapIntensity:1.1 }),   // black carrier: half see-through in clear mode so the firing pin shows
+  oprod:  new THREE.MeshStandardMaterial({ color:0xc5c9ce, roughness:0.3, metalness:1, envMapIntensity:1.2 }),   // silver operating-rod tube
   dsteel: new THREE.MeshStandardMaterial({ color:0x55595f, roughness:0.32, metalness:1, envMapIntensity:1.1 }),
   spring: new THREE.MeshStandardMaterial({ color:0xc9ced6, roughness:0.25, metalness:1 }),
   follower: new THREE.MeshStandardMaterial({ color:0x4f6b3a, roughness:0.6 }),
@@ -195,7 +196,7 @@ const M = {
   copper: new THREE.MeshStandardMaterial({ color:0xb8733a, roughness:0.28, metalness:1 }),
   flash:  new THREE.MeshBasicMaterial({ color:0xffc46b, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }),
 };
-const SHELL = [[M.gun, 0.16], [M.gunDark, 0.2], [M.poly, 0.14], [M.gripPoly, 0.18], [M.mag, 0.2], [M.rubber, 0.2], [M.grip, 0.3], [M.carrier, 0.38]];
+const SHELL = [[M.gun, 0.16], [M.gunDark, 0.2], [M.poly, 0.14], [M.gripPoly, 0.18], [M.mag, 0.2], [M.rubber, 0.2], [M.grip, 0.3], [M.carrier, 0.38], [M.oprod, 0.4]];
 function setClear(on){
   SHELL.forEach(([m, o])=>{ m.transparent = on; m.opacity = on ? o : 1; m.depthWrite = !on; m.side = on ? THREE.DoubleSide : THREE.FrontSide; m.needsUpdate = true; });
   parts.portCover.forEach(o=>o.visible = !on);
@@ -285,16 +286,22 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.2,0.74],[-1.1,0.77],[-1.21,0.73],[-1.25,0.66]]), 0.6, M.gun, 0.035));
   [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
   [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
-  // rear sight: knurled drum on the hump, aperture on the sight line
+  // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
+  // windage drum with spanner holes on its right side, L-shaped flip aperture (two leaves at 90°) on top at the rear
   const rs = new THREE.Group(); rec.add(rs); parts.rearSight = rs;
-  at(rs, rbox(0.52, 0.1, 0.46, 0.03, M.gun), -0.55, 0.8, 0);
-  at(rs, cylZ(0.13, 0.3, M.gunDark, 32), -0.55, 0.95, 0);
-  for (let k=-3;k<=3;k++) at(rs, new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.007, 4, 32), M.gunDark), -0.55, 0.95, k*0.042);
-  at(rs, cylZ(0.05, 0.36, M.dsteel, 16), -0.55, 0.95, 0);
-  at(rs, cylX(0.022, 0.02, M.black, 12), -0.685, SIGHT_Y, 0);
-  // ejection port + charging-handle slot (right side)
-  const port = at(rec, box(0.85, 0.16, 0.02, M.black), 0.45, 0.42, 0.335);
-  const slot = at(rec, box(1.55, 0.05, 0.02, M.black), 0.25, 0.65, 0.335);
+  rs.add(profile(shape([[-0.95,0.74],[-0.95,0.9],[-0.88,0.96],[-0.48,0.96],[-0.4,0.93,-0.32,0.85],[-0.2,0.74]]), 0.44, M.gun, 0.03));
+  at(rs, cylZ(0.115, 0.06, M.gunDark, 32), -0.6, 0.86, 0.24);                       // windage drum
+  at(rs, cylZ(0.09, 0.012, M.dsteel, 32), -0.6, 0.86, 0.275);
+  at(rs, cylZ(0.03, 0.02, M.steel, 16), -0.6, 0.86, 0.28);                           // centre screw
+  for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(rs, cylZ(0.014, 0.016, M.black, 8), -0.6 + Math.cos(a)*0.06, 0.86 + Math.sin(a)*0.06, 0.28); }
+  const flip = new THREE.Group(); flip.position.set(-0.8, 0.96, 0); rs.add(flip);
+  at(flip, rbox(0.035, 0.15, 0.2, 0.012, M.gunDark), 0.02, 0.075, 0);               // upright leaf (sight line goes through its hole)
+  at(flip, rbox(0.15, 0.035, 0.2, 0.012, M.gunDark), -0.06, 0.02, 0);               // second leaf lying back
+  at(flip, cylZ(0.022, 0.24, M.dsteel, 12), 0, 0, 0);                                // flip pivot
+  at(rs, cylX(0.022, 0.04, M.black, 12), -0.78, SIGHT_Y, 0);
+  // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
+  const port = at(rec, box(0.85, 0.18, 0.02, M.black), 0.525, 0.57, 0.335);
+  const slot = at(rec, box(1.6, 0.05, 0.02, M.black), 0.25, 0.5, 0.335);
   parts.portCover.push(port, slot);
   // --- lower receiver: shallow (photo: bottom ≈ y -0.2), flared magwell, takedown pins, magazine release with fence ---
   rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.0],[1.26,-0.14],[1.32,-0.22],[0.06,-0.22],[0.06,-0.2],[-0.5,-0.2],[-0.95,-0.19],[-1.25,-0.12]]), 0.56, M.gun, 0.035));
@@ -302,7 +309,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   [[-1.02,0.02],[1.12,0.02]].forEach(([x,y])=>at(rec, cylZ(0.05, 0.64, M.dsteel, 16), x, y, 0));
   // fire-control pins (AR layout): trigger pin in front and lower, hammer pin behind and higher
   const TRIG_PIN = [-0.1, -0.1], HAM_PIN = [-0.24, 0.0];
-  [TRIG_PIN, HAM_PIN].forEach(([x,y])=>at(rec, cylZ(0.03, 0.6, M.dsteel, 12), x, y, 0));
+  [TRIG_PIN, HAM_PIN].forEach(([x,y])=>at(rec, cylZ(0.028, 0.636, M.dsteel, 12), x, y, 0));
+  // raised panel over the right of the magwell, magazine release button at its rear end
+  at(rec, rbox(1.0, 0.24, 0.04, 0.015, M.gun), 0.72, -0.07, 0.3);
+  at(rec, rbox(1.0, 0.03, 0.06, 0.01, M.gun), 0.72, 0.06, 0.3);
   at(rec, cylZ(0.055, 0.08, M.dsteel), 0.2, -0.07, 0.3);
   at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 20), M.gun), 0.2, -0.07, 0.3);
   rec.add(profile(shape([[-0.5,-0.2],[-0.5,-0.48],[-0.5,-0.54,-0.43,-0.54],[0.02,-0.54],[0.08,-0.54,0.08,-0.47],[0.08,-0.2],[0.02,-0.2],[0.02,-0.47],[-0.43,-0.47],[-0.43,-0.2]]), 0.14, M.gun, 0.015));
@@ -313,26 +323,40 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   rec.add(trig); parts.trigger = trig;
   // --- pistol grip (photo: top x -1.0…-0.5 under the receiver, bottom x -1.5…-0.95 at y≈-1.4), finger bump, checkered panels ---
   rec.add(profile(shape([[-0.46,-0.18],[-1.0,-0.18],[-1.07,-0.26],[-1.47,-1.2],[-1.52,-1.36,-1.38,-1.41],[-1.0,-1.45],[-0.86,-1.43,-0.88,-1.31],[-0.76,-1.0],[-0.64,-0.84,-0.68,-0.72],[-0.52,-0.36]]), 0.42, M.gripPoly, 0.05));
-  // --- selector (left): knob at the narrow end, plate bulges into a lobe and comes to a point ---
-  // seen from the left the muzzle is to the viewer's left. K2 marks run clockwise from the muzzle side:
-  // 안전 (toward the muzzle) → 단발 (up) → 연발 (toward the stock) → 점사 (down), and the lever turns all the way round
-  const SX = -0.52, SY = -0.1;
-  const sel = new THREE.Group(); sel.position.set(SX, SY, -0.31);
-  const cam = new THREE.Shape();
-  cam.moveTo(0, 0.07); cam.absarc(0, 0, 0.07, Math.PI/2, Math.PI*1.5, false);
-  cam.quadraticCurveTo(0.08, -0.12, 0.17, -0.115); cam.quadraticCurveTo(0.29, -0.1, 0.33, 0);
-  cam.quadraticCurveTo(0.29, 0.1, 0.17, 0.115); cam.quadraticCurveTo(0.08, 0.12, 0, 0.07);
-  const selPlate = extrude(cam, 0.022, M.dsteel, 0.008); selPlate.position.z = -0.022; sel.add(selPlate);
-  at(sel, cylZ(0.06, 0.11, M.dsteel, 28), 0, 0, -0.07);
-  at(sel, cylZ(0.063, 0.015, M.steel, 28), 0, 0, -0.125);
-  rec.add(sel); parts.selector = sel;
+  // --- selector (left, photo): pear-shaped lever on its pivot, pointed tip at the selected mark, round thumb knob on the
+  // opposite end. Seen from the left the muzzle is to the viewer's left; K2 marks run clockwise from the muzzle side:
+  // 안전 (toward the muzzle) → 단발 (up) → 연발 (toward the stock, under the knob on safe) → 점사 (down), all the way round
+  const SX = -0.63, SY = -0.03, LZ = -0.315;            // LZ: left face of the lower receiver
+  const sel = new THREE.Group(); sel.position.set(SX, SY, LZ); rec.add(sel); parts.selector = sel;
+  const lever = new THREE.Shape();
+  lever.moveTo(0.085, 0); lever.quadraticCurveTo(0.0, 0.07, -0.11, 0.075);
+  lever.absarc(-0.11, 0, 0.075, Math.PI/2, Math.PI*1.5, false);
+  lever.quadraticCurveTo(0.0, -0.07, 0.085, 0);
+  const selPlate = extrude(lever, 0.012, M.dsteel, 0.006); selPlate.position.z = -0.018; sel.add(selPlate);
+  at(sel, cylZ(0.042, 0.05, M.dsteel, 28), -0.13, 0, -0.045);                        // thumb knob
+  at(sel, shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.042, 24, 12, 0, Math.PI*2, 0, Math.PI/2), M.dsteel)), -0.13, 0, -0.07).rotation.x = -Math.PI/2;
+  at(sel, cylZ(0.018, 0.012, M.steel, 16), 0, 0, -0.026);                            // pivot screw
   // +z rotation is clockwise as seen from the left, so each step is a quarter turn further
   parts.SEL_ANG = [0, Math.PI*0.5, Math.PI, Math.PI*1.5];
-  [['안전', 0, 0.45, -0.345], ['단발', 1, 0.38, -0.345], ['연발', 2, 0.45, -0.345], ['점사', 3, 0.36, -0.275]].forEach(([t, i, r, z])=>{
-    const w = word(t, i ? '#e6e6e6' : '#9be7a7', 0.07); w.rotation.y = Math.PI;
-    const a = parts.SEL_ANG[i];
-    w.position.set(SX + Math.cos(a)*r, SY + Math.sin(a)*r, z); rec.add(w); tag(w, 'selector');   // clear of the wider upper receiver; 점사 sits on the grip
-  });
+  // markings engraved into the receiver: dark letters with a light lower edge, plus a bump map so they read as cut in
+  (function(){
+    const N = 512, R = 0.115, SZ = 0.42, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const bm = document.createElement('canvas'); bm.width = bm.height = N;
+    const g = cv.getContext('2d'), gb = bm.getContext('2d');
+    gb.fillStyle = '#fff'; gb.fillRect(0, 0, N, N);
+    [['안 전', 0], ['단 발', 1], ['연 발', 2], ['점 사', 3]].forEach(([t, i])=>{
+      const a = parts.SEL_ANG[i], x = N/2 - Math.cos(a)*R/SZ*N, y = N/2 - Math.sin(a)*R/SZ*N;   // canvas x runs toward the stock (seen from the left)
+      g.font = 'bold 34px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(210,214,218,.55)'; g.fillText(t, x + 1.5, y + 1.5);
+      g.fillStyle = 'rgba(14,15,16,.9)'; g.fillText(t, x, y);
+      gb.font = g.font; gb.textAlign = 'center'; gb.textBaseline = 'middle'; gb.fillStyle = '#000'; gb.fillText(t, x, y);
+    });
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+    const mark = new THREE.Mesh(new THREE.PlaneGeometry(SZ, SZ), new THREE.MeshStandardMaterial({ map:tex, bumpMap:new THREE.CanvasTexture(bm), bumpScale:0.004,
+      transparent:true, depthWrite:false, roughness:0.5, metalness:0.5, polygonOffset:true, polygonOffsetFactor:-2 }));
+    mark.rotation.y = Math.PI; mark.position.set(SX, SY, LZ - 0.0015); rec.add(mark);
+    parts.portCover.push(mark);          // hidden in clear view with the receiver skin
+  })();
   tag(sel, 'selector');
   // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
   at(rec, rbox(0.28, 0.86, 0.64, 0.05, M.gun), -1.38, 0.3, 0);
@@ -383,57 +407,79 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   for (let k=0;k<5;k++){ const a = k*Math.PI*2/5 + 0.3; at(rec, box(0.45, 0.025, 0.02, M.black), 6.86, BORE + Math.sin(a)*0.1, Math.cos(a)*0.1).rotation.x = a; }
   parts.muzzle = at(rec, new THREE.Object3D(), 7.17, BORE, 0);
 
-  // === internals (K2: long-stroke piston + operating rod, AR-type rotating bolt, one recoil spring on a rod above the carrier) ===
+  // === internals (K2 field-strip photo: boxy carrier with an AR-type rotating bolt, long-stroke piston on a silver
+  // operating-rod tube fixed to the carrier, one long recoil spring on a guide rod running from the rear supporter into that tube) ===
   const carrier = new THREE.Group(); rec.add(carrier); parts.carrier = carrier;
-  // each piece is its own group so disassembly mode can lift it out: [name, group, exploded offset]
+  parts.CARRIER_OUT = new THREE.Vector3(-0.2, 1.5, 0);      // stage 1: the whole carrier group lifts out of the opened upper
+  // each piece is its own group so disassembly can lift it out. stage 1 = comes out as a unit, stage 2 = field-stripped carrier group
   parts.explode = [];
-  function piece(name, x, y, z, off, labelAt = [0, 0.3, 0], parent = carrier){
+  function piece(name, x, y, z, off, labelAt = [0, 0.3, 0], parent = carrier, stage = 2){
     const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
     const sp = tagSprite(name); sp.position.set(...labelAt); g.add(sp);
-    parts.explode.push({ g, base:g.position.clone(), off:new THREE.Vector3(...off), label:sp });
+    parts.explode.push({ g, base:g.position.clone(), off:new THREE.Vector3(...off), label:sp, stage });
     return g;
   }
-  // carrier body (x 0.12…1.12) around the bore: cam-pin track, firing-pin bore, spring lug on top at the rear
-  const body = piece('노리쇠뭉치', 0.62, 0.43, 0, [-0.3, 1.9, 0], [0, 0.36, 0]);
-  at(body, rbox(1.0, 0.26, 0.24, 0.03, M.carrier), 0, 0, 0);
-  at(body, box(0.26, 0.08, 0.01, M.black), 0.23, 0, 0.125);
-  at(body, box(0.18, 0.06, 0.01, M.black), -0.2, 0.04, 0.125);
-  at(body, rbox(0.14, 0.15, 0.14, 0.03, M.carrier), -0.43, 0.21, 0);
-  // rotating bolt: lugged head (face at x≈1.29), extractor, tail
-  const bolt = piece('노리쇠', 1.0, BORE, 0, [1.4, 1.95, 0], [0, 0.25, 0]);
-  at(bolt, cylX(0.068, 0.5, M.dsteel, 16), -0.1, 0, 0);
-  at(bolt, cylX(0.085, 0.1, M.dsteel, 16), 0.2, 0, 0);
-  for (let k=0;k<7;k++){ const a = k*Math.PI*2/7; at(bolt, box(0.06, 0.035, 0.035, M.dsteel), 0.26, Math.sin(a)*0.085, Math.cos(a)*0.085); }
-  at(bolt, box(0.16, 0.03, 0.03, M.steel), 0.15, 0.08, 0.04);
-  at(bolt, cylY(0.03, 0.18, M.black, 10), -0.15, 0, 0);
-  // firing pin: runs the whole carrier, head just behind the carrier (where the hammer strikes) to the tip at the bolt face
-  const fpin = piece('공이', 0.715, BORE, 0, [-1.3, 2.6, 0], [0, 0.18, 0]);
+  // carrier body (x 0.12…1.12): block around the bore with lightening cuts, cam-pin track on top, bolt bore in front,
+  // ejection-side window, mount block on top for the operating-rod tube
+  const body = piece('노리쇠뭉치', 0.62, 0.42, 0, [0, 0, 0], [0, 0.42, 0], carrier, 1);
+  at(body, rbox(1.0, 0.26, 0.24, 0.035, M.carrier), 0, 0, 0);
+  [0.123, -0.123].forEach(z=>{ at(body, box(0.5, 0.05, 0.006, M.black), -0.18, 0.06, z); at(body, box(0.5, 0.012, 0.006, M.black), -0.18, -0.07, z); });
+  at(body, rbox(0.3, 0.1, 0.008, 0.004, M.black), 0.22, -0.02, 0.122);                // ejection-side window
+  at(body, box(0.22, 0.006, 0.07, M.black), 0.24, 0.131, 0);                         // cam-pin track
+  at(body, cylX(0.07, 0.006, M.black, 20), 0.502, -0.04, 0);                          // bolt bore
+  at(body, cylX(0.03, 0.006, M.black, 12), -0.502, -0.04, 0);                         // firing-pin hole at the back
+  at(body, rbox(0.3, 0.07, 0.12, 0.015, M.carrier), 0.0, 0.16, 0);                   // tube mount block
+  [-0.07, 0.07].forEach(x=>at(body, cylY(0.016, 0.01, M.black, 10), x, 0.196, 0));    // its two screws
+  // rotating bolt: 7 lugs + extractor at the face (x≈1.29), gas rings on the tail, cam-pin hole
+  const bolt = piece('노리쇠', 1.0, BORE, 0, [1.3, -0.3, 0], [0.05, -0.2, 0]);
+  at(bolt, cylX(0.04, 0.2, M.dsteel, 16), -0.32, 0, 0);                              // tail
+  [-0.24, -0.27, -0.3].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.041, 0.006, 6, 20), M.steel); r.rotation.y = Math.PI/2; at(bolt, shadowed(r), x, 0, 0); });
+  at(bolt, cylX(0.064, 0.36, M.dsteel, 20), -0.04, 0, 0);                            // body
+  at(bolt, cylY(0.026, 0.135, M.black, 10), -0.15, 0, 0);                            // cam-pin hole
+  at(bolt, cylX(0.08, 0.1, M.dsteel, 20), 0.2, 0, 0);                                // head
+  for (let k=0;k<8;k++){ if (k === 1) continue; const a = k*Math.PI*2/8; at(bolt, box(0.06, 0.04, 0.036, M.dsteel), 0.258, Math.sin(a)*0.085, Math.cos(a)*0.085).rotation.x = -a; }
+  const ex = at(bolt, box(0.3, 0.03, 0.04, M.steel), 0.13, Math.sin(Math.PI/4)*0.08, Math.cos(Math.PI/4)*0.08); ex.rotation.x = -Math.PI/4;   // extractor
+  at(bolt, cylX(0.05, 0.006, M.black, 18), 0.29, 0, 0);                              // face recess
+  at(bolt, cylX(0.01, 0.008, M.steel, 8), 0.292, -0.025, -0.018);                    // ejector
+  // firing pin: head just behind the carrier (where the hammer strikes), flange, long shank to the tip at the bolt face
+  const fpin = piece('공이', 0.715, BORE, 0, [-1.7, -0.45, 0], [-0.3, -0.15, 0]);
   at(fpin, cylX(0.016, 1.13, M.steel, 10), 0, 0, 0);
   at(fpin, cylX(0.026, 0.05, M.steel, 14), -0.55, 0, 0);
   at(fpin, cylX(0.036, 0.04, M.steel, 14), -0.38, 0, 0);
   at(fpin, cylX(0.008, 0.04, M.steel, 8), 0.565, 0, 0);
-  // cam pin: turns the bolt as the carrier moves
-  const cpin = piece('캠핀', 0.85, 0.47, 0, [0.75, 2.4, 0], [0, 0.22, 0]);
-  at(cpin, cylY(0.035, 0.18, M.dsteel, 14), 0, 0, 0);
-  at(cpin, box(0.09, 0.05, 0.09, M.dsteel), 0, 0.1, 0);
-  // firing-pin retaining pin: crosses the carrier just behind the firing pin's big shoulder
-  const rpin = piece('공이고정핀', 0.29, BORE, 0, [0.35, 2.6, 0], [0, 0.18, 0]);
-  at(rpin, cylZ(0.012, 0.26, M.steel, 8), 0, 0, 0);
-  at(rpin, cylZ(0.022, 0.02, M.steel, 10), 0, 0, 0.12);
-  // operating rod + piston head (long-stroke) and the link to the charging handle
-  const rod = piece('가스피스톤', 3.0, 0.64, 0, [0, 3.1, 0], [0, 0.18, 0]);
-  at(rod, cylX(0.03, 3.85, M.steel, 12), 0, 0, 0);
-  at(rod, cylX(0.055, 0.14, M.dsteel, 16), 1.9, 0, 0);
-  at(rod, rbox(0.25, 0.14, 0.12, 0.02, M.steel), -2.0, 0, 0);
-  const handle = piece('장전손잡이', 1.0, 0.62, 0.3, [0.9, 1.35, 1.4], [0, 0.25, 0.2]);
-  at(handle, cylZ(0.035, 0.24, M.gun), 0, 0, 0.1);
-  at(handle, cylZ(0.09, 0.12, M.gun), 0, 0, 0.24);
+  // cam pin: square head riding in the track on top of the carrier, shank down through the bolt
+  const cpin = piece('캠핀', 0.85, 0.465, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
+  at(cpin, cylY(0.026, 0.17, M.dsteel, 14), 0, 0, 0);
+  at(cpin, rbox(0.08, 0.03, 0.08, 0.008, M.dsteel), 0, 0.1, 0);
+  at(cpin, cylZ(0.009, 0.06, M.black, 8), 0, -0.085 + 0.0, 0);                    // hole the firing pin passes through
+  // firing-pin retaining pin: cotter pin across the carrier behind the firing pin's flange, head on the left side
+  const rpin = piece('공이고정핀', 0.29, BORE, 0, [-0.7, 0.85, 0], [0, 0.18, 0]);
+  at(rpin, cylZ(0.01, 0.25, M.steel, 8), 0, 0, 0);
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.006, 6, 14), M.steel); at(rpin, shadowed(loop), 0, 0, -0.135);
+  // operating-rod tube (silver): mount at the carrier, long tube inside the gas tube, cone, piston rod, ringed piston head
+  const rod = piece('가스피스톤', 2.0, 0.64, 0, [0.3, 0.9, 0], [0, 0.18, 0], carrier, 1);
+  at(rod, cylX(0.055, 3.25, M.oprod, 20), 0.075, 0, 0);                              // tube x 0.45…3.7
+  at(rod, rbox(0.14, 0.13, 0.13, 0.02, M.oprod), -1.48, -0.02, 0);                   // rear block on the carrier mount
+  const taper = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.055, 0.2, 20), M.oprod); taper.rotation.z = -Math.PI/2; at(rod, shadowed(taper), 1.8, 0, 0);
+  at(rod, cylX(0.035, 0.9, M.oprod, 16), 2.35, 0, 0);
+  at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
+  [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
+  // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
+  const handle = piece('장전손잡이', 0.93, 0.5, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
+  at(handle, cylZ(0.028, 0.2, M.gun), 0, 0, -0.08);                                  // stem from the carrier out through the slot
+  at(handle, rbox(0.4, 0.05, 0.022, 0.008, M.gun), 0.17, -0.005, 0.048);             // slide plate
+  at(handle, rbox(0.06, 0.1, 0.022, 0.008, M.gun), 0.36, 0.02, 0.048);               // its stepped front end
+  at(handle, cylZ(0.07, 0.12, M.gunDark, 24), 0, 0, 0.11);                          // knob
+  const hring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.018, 8, 24), M.gunDark); at(handle, shadowed(hring), 0, 0, 0.17);
+  at(handle, cylZ(0.04, 0.01, M.black, 16), 0, 0, 0.166);                            // hollow end
+  tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
-  // recoil spring: one thin spring on a guide rod above the carrier, from the rear supporter (which also latches the upper) to the carrier lug
-  const sp = piece('복좌용수철', -1.1, 0.64, 0, [-0.5, 1.6, 0], [0.6, 0.22, 0], rec);
-  at(sp, cylX(0.014, 1.4, M.steel, 8), 0.7, 0, 0);
-  const rsp = coil(0.042, 24, 0.0075, M.spring); rsp.rotation.z = -Math.PI/2; rsp.position.set(0.04, 0, 0); sp.add(rsp); parts.recoilSpring = rsp;
-  at(sp, rbox(0.1, 0.2, 0.3, 0.03, M.steel), 0, 0, 0);                         // supporter
+  // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
+  // operating-rod tube and bears on a stop inside it (x 1.8 with the carrier home)
+  const sp = piece('복좌용수철', -1.1, 0.64, 0, [-0.3, 2.3, 0], [0.7, 0.2, 0], rec, 1);
+  at(sp, cylX(0.014, 1.5, M.steel, 8), 0.75, 0, 0);
+  const rsp = coil(0.04, 70, 0.0075, M.spring); rsp.rotation.z = -Math.PI/2; rsp.position.set(0.04, 0, 0); sp.add(rsp); parts.recoilSpring = rsp;
+  at(sp, rbox(0.1, 0.24, 0.3, 0.03, M.steel), 0, 0, 0);                         // supporter
   at(sp, cylX(0.045, 0.1, M.dsteel, 16), -0.12, -0.02, 0);                      // latch button at the back of the upper
   // hammer on its pin: falls forward onto the firing-pin head, leans back under the carrier when cocked
   const hammer = new THREE.Group(); hammer.position.set(HAM_PIN[0], HAM_PIN[1], 0); rec.add(hammer); parts.hammer = hammer;
@@ -444,7 +490,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   parts.HAM_FALL = -0.79; parts.HAM_COCK = 1.2;   // fallen: head on the firing-pin head (≈0.13, 0.36)
   const ch = makeRound(true); ch.rotation.z = -Math.PI/2; ch.position.set(1.28, BORE, 0); rec.add(ch); parts.chamberRound = ch;
   // bolt strip seen through the ejection port when the shell is opaque
-  const strip = at(rec, box(0.85, 0.12, 0.02, M.steel), 0.45, 0.42, 0.34); parts.bolt = strip;
+  const strip = at(rec, box(0.85, 0.16, 0.02, M.carrier), 0.525, 0.57, 0.34); parts.bolt = strip;
   parts.portCover.push(strip);
 
   // --- magazine: shell + rounds / follower / spring inside ---
@@ -636,7 +682,7 @@ const S = {
   carrier:0, carrierV:0, dragging:false, extracted:false, charging:null,
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
-  bayonet:false, bay:0, disasm:false, ex:0, gas:2, spent:false, cycle:null, feed:null,
+  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, spent:false, cycle:null, feed:null,
   hits:0, points:0, rangeShots:0,
 };
 let msg = '', msgT = 0;
@@ -701,9 +747,9 @@ function fire(){
     S.burst = 0;
     say('가스 차단 — 노리쇠를 손으로 당겨야 해요 (F)');
   } else {
-    S.cycle = { t:0, dur:S.clear ? 0.9 : rate*0.85, fed:false };
+    S.cycle = { t:0, dur:rate*0.85, fed:false };          // full speed always (≈800 rpm)
   }
-  S.cooldown = S.clear ? 1.0 : rate; S.streak++;
+  S.cooldown = rate; S.streak++;
   if (view === 'range') shootTarget();
   if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) try { navigator.vibrate(25); } catch(e){}
   renderHud();
@@ -774,10 +820,10 @@ function toggleBayonet(){
   setTimeout(()=>{ burst({ freq:2600, q:3, vol:0.6, dur:0.03 }); tone(1500, 0.2, 0.05, 'square'); }, 140);
   renderHud();
 }
-// field strip: the bolt carrier group comes apart and floats above the rifle with names
+// field strip in two steps: carrier group out as a unit, then the carrier group itself apart (labels name each part)
 function toggleDisasm(){
   if (view !== 'inspect') setView('inspect');
-  S.disasm = !S.disasm; S.charging = null; S.trigger = false; S.burst = 0;
+  S.disasm = (S.disasm + 1) % 3; S.charging = null; S.trigger = false; S.burst = 0;   // 0 assembled → 1 carrier group out → 2 carrier group stripped
   burst({ freq:1600, q:2, vol:0.45, dur:0.05 }); tone(700, 0.15, 0.06, 'square', 0.04);
   renderHud();
 }
@@ -820,7 +866,7 @@ function inspectCamera(){
 function setView(v){
   view = v;
   const isRange = v === 'range';
-  if (isRange) S.disasm = false;
+  if (isRange) S.disasm = 0;
   document.body.classList.toggle('range', isRange);
   range.visible = isRange; ground.visible = !isRange;
   scene.fog = isRange ? new THREE.Fog(0xdcecf8, 150, 700) : null;
@@ -864,7 +910,8 @@ function renderHud(){
   [...selEl.children].forEach((s, i)=>{ s.classList.toggle('on', i === S.selector); s.classList.toggle('safe', i === 0); });
   let t, cls = 'warn';
   if (msgT > 0) t = msg;
-  else if (S.disasm) t = '분해 상태 — 노리쇠뭉치를 둘러보세요 (D 조립)';
+  else if (S.disasm === 1) t = '분해 1단계 — 노리쇠뭉치를 누르거나 D로 노리쇠뭉치 분해';
+  else if (S.disasm === 2) t = '노리쇠뭉치 분해 — D로 조립';
   else if (!S.chambered && !(S.mag && S.attached)) t = '탄창이 분리돼 있어요 — 탄창 결합 (R)';
   else if (S.spent && !S.cycle) t = '약실에 빈 탄피 — 노리쇠를 당기세요 (F)';
   else if (!S.chambered && S.mag.count > 0) t = '약실이 비었어요 — 노리쇠를 당기세요 (F)';
@@ -879,8 +926,8 @@ function renderHud(){
   document.getElementById('bClear').classList.toggle('on', S.clear);
   document.getElementById('gasChip').textContent = `가스 ${GAS[S.gas]}`;
   document.getElementById('bBay').classList.toggle('on', S.bayonet);
-  document.querySelector('#bDis b').textContent = S.disasm ? '조립' : '분해';
-  document.getElementById('bDis').classList.toggle('on', S.disasm);
+  document.querySelector('#bDis b').textContent = ['분해', '노리쇠 분해', '조립'][S.disasm];
+  document.getElementById('bDis').classList.toggle('on', S.disasm > 0);
 }
 
 // ---------- input ----------
@@ -906,7 +953,8 @@ cvs.addEventListener('pointerdown', e=>{
   if (!hit) return;
   controls.enabled = false; cvs.setPointerCapture(e.pointerId);
   const part = hit.object.userData.part;
-  if (part === 'handle' && !S.disasm){
+  if (S.disasm && (part === 'bcg' || part === 'handle')){ active = 'ui'; if (S.disasm === 1) toggleDisasm(); }
+  else if (part === 'handle' && !S.disasm){
     active = 'handle'; S.dragging = true; S.extracted = false; S.cycle = null; S.charging = null;
     dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), hit.point);
     dragX0 = rec.worldToLocal(hit.point.clone()).x; dragC0 = S.carrier;
@@ -991,7 +1039,7 @@ document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
-const PORT0 = 0.025, PORT1 = 0.875;     // ejection port span (x)
+const PORT0 = 0.1, PORT1 = 0.95;     // ejection port span (x)
 let hudT = 0;
 function animate(){
   const dt = Math.min(clock.getDelta(), 1/30), t = clock.elapsedTime;
@@ -1013,21 +1061,21 @@ function animate(){
     }
     if (u >= 1){ S.carrier = 0; S.carrierV = 0; S.cycle = null; }
   } else if (S.charging){
-    // manual charge (F / button): slower in clear view so the feed can be followed
-    const back = S.clear ? 0.5 : 0.16;
+    // manual charge (F / button): a quick snatch back, then let go
+    const back = 0.09;
     S.charging.t += dt;
     S.carrier = Math.min(TRAVEL, S.charging.t/back*TRAVEL);
-    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + 0.1){ S.charging = null; chargeRelease(); } }
+    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > back + 0.03){ S.charging = null; chargeRelease(); } }
   } else if (!S.dragging){
-    const k = S.clear ? 140 : 1600;   // slow motion in clear view
+    const k = 2500;                   // spring snaps the carrier home
     for (let i=0;i<4;i++) [S.carrier, S.carrierV] = spring(S.carrier, S.carrierV, 0, k, 2*Math.sqrt(k)*1.05, dt/4);
     if (S.carrier < 0) S.carrier = 0;
   }
   if (S.carrier > 0.3) S.cocked = true;
   if (S.ex > 0.05) S.carrier = 0;
-  parts.carrier.position.x = -S.carrier;
-  // recoil spring compresses as the carrier comes back (supporter front x=-1.06 to the rear face of the carrier lug x=0.12)
-  parts.recoilSpring.scale.y = Math.max(0.12, 1.18 - S.carrier);
+  parts.carrier.position.set(-S.carrier, 0, 0).addScaledVector(parts.CARRIER_OUT, S.ex*S.ex*(3 - 2*S.ex));
+  // recoil spring compresses as the carrier comes back
+  parts.recoilSpring.scale.y = Math.max(0.3, 2.86 - S.carrier);   // supporter (x -1.06) to the stop inside the op-rod tube (x 1.8 - carrier)
   // bolt strip in the port (opaque mode): the part of the carrier/bolt (x 0.12…1.29) that is behind the port
   const b0 = 0.12 - S.carrier, b1 = 1.29 - S.carrier, lo = Math.max(b0, PORT0), hi = Math.min(b1, PORT1);
   parts.bolt.visible = !S.clear && hi > lo && S.ex < 0.05; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
@@ -1065,13 +1113,16 @@ function animate(){
   const off = 1 - S.bay;
   parts.bayonet.position.set(off*2.2, 0, 0);
 
-  // disassembly: lift every bolt-group piece out to its own spot
+  // disassembly: stage 1 opens the upper and lifts the carrier group out whole (with the spring assembly and the
+  // operating rod beside it); stage 2 field-strips the carrier group into carrier, bolt, firing pin, cam pin, retaining pin
   S.ex += ((S.disasm ? 1 : 0) - S.ex) * Math.min(1, dt*6);
-  const ease = S.ex*S.ex*(3 - 2*S.ex);
+  S.ex2 += ((S.disasm === 2 ? 1 : 0) - S.ex2) * Math.min(1, dt*6);
+  const ease = S.ex*S.ex*(3 - 2*S.ex), ease2 = S.ex2*S.ex2*(3 - 2*S.ex2);
   parts.explode.forEach((p, i)=>{
-    p.g.position.copy(p.base).addScaledVector(p.off, ease);
-    if (S.disasm) p.g.position.y += Math.sin(t*1.5 + i)*0.03*ease;
-    p.label.material.opacity = ease > 0.6 ? (ease - 0.6)/0.4 : 0;
+    const e = p.stage === 1 ? ease : ease2;
+    p.g.position.copy(p.base).addScaledVector(p.off, e);
+    if (S.disasm) p.g.position.y += Math.sin(t*1.5 + i)*0.03*e;
+    p.label.material.opacity = e > 0.6 ? (e - 0.6)/0.4 : 0;
   });
   parts.upper.rotation.z = -0.33*ease;   // rear lifts, barrel tips down
   controls.target.y += ((S.disasm ? 1.0 : -0.2) - controls.target.y) * Math.min(1, dt*4);
