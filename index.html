@@ -336,16 +336,16 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // rear sight (close-up photo): housing raised out of the back of the upper, sloping down toward the front;
   // windage drum with spanner holes on its right side, L-shaped flip aperture (two leaves at 90°) on top at the rear
   const rs = new THREE.Group(); rec.add(rs); parts.rearSight = rs;
-  // (photos) the housing is the receiver itself rising into a hump: full receiver width, sides flush with the receiver's
-  // sides, a long gentle slope up from the front and a rounded shoulder at the back; the windage drum sits in its side
-  rs.add(profile(shape([[-1.12,0.74],[-1.12,0.9],[-1.1,0.985,-1.0,0.99],[-0.6,0.99],[-0.3,0.99,-0.12,0.86],[0.0,0.77],[0.12,0.745],[0.2,0.74]]), 0.56, M.gun, 0.03));
+  // (photos) not a block: the receiver's LEFT and RIGHT side walls themselves rise into a fin each — a long concave sweep up
+  // from the front, a rounded crown at the back, and a rear edge leaning back down to the latch. The aperture stands in
+  // the open slot between the two fins; the windage drum sits in the right fin
+  const finShape = ()=>shape([[0.08,0.74],[0.08,0.77],[-0.22,0.785,-0.42,0.9],[-0.6,1.02,-0.74,1.1],[-0.86,1.16,-0.98,1.14],[-1.08,1.12,-1.11,1.02],[-1.15,0.86],[-1.15,0.74]]);
+  [1, -1].forEach(sd=>{ const fin = profile(finShape(), 0.055, M.gun, 0.018); fin.position.z += sd*0.258; rs.add(fin); });
+  at(rs, rbox(0.34, 0.2, 0.42, 0.02, M.gun), -0.82, 0.86, 0);                          // floor of the slot the aperture stands in
   at(rs, cylZ(0.115, 0.03, M.gunDark, 32), -0.6, 0.86, 0.3);                        // windage drum, standing just proud of the side
   at(rs, cylZ(0.09, 0.012, M.dsteel, 32), -0.6, 0.86, 0.318);
   at(rs, cylZ(0.03, 0.02, M.steel, 16), -0.6, 0.86, 0.322);                          // centre screw
   for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(rs, cylZ(0.014, 0.016, M.black, 8), -0.6 + Math.cos(a)*0.06, 0.86 + Math.sin(a)*0.06, 0.322); }
-  // protective side walls (ears) either side of the aperture, rounded tops
-  // (photos): tall ears with rounded tops that rise above the aperture so they shield it from the sides
-  [0.13, -0.13].forEach(z=>{ const w = profile(shape([[-0.97,0.95],[-0.97,1.08],[-0.96,1.16,-0.87,1.16],[-0.75,1.16],[-0.66,1.16,-0.65,1.07],[-0.62,0.98],[-0.88,0.98]]), 0.05, M.gun, 0.014); w.position.z += z; rs.add(w); });
   // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
   // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
   const flip = new THREE.Group(); flip.position.set(-0.8, 0.965, 0); rs.add(flip); parts.flip = flip;
@@ -727,11 +727,13 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(sp, rbox(0.1, 0.24, 0.3, 0.03, M.steel), 0, 0, 0);                         // supporter
   at(sp, rbox(0.1, 0.2, 0.46, 0.02, M.gunDark), -0.12, -0.105, 0);              // plug filling the rear opening of the upper
   // latch (photos): knurled tab sticking up at the back of the upper; push it in to let the upper hinge open
-  // latch (photos): a knurled wheel, like a small gear, standing up at the back of the upper
-  at(sp, rbox(0.08, 0.1, 0.12, 0.02, M.gunDark), -0.13, 0.06, 0);
-  at(sp, cylZ(0.052, 0.2, M.gunDark, 28), -0.14, 0.12, 0);
-  for (let k=0;k<18;k++){ const a = k*Math.PI*2/18; at(sp, box(0.034, 0.014, 0.2, M.dsteel), -0.14 + Math.cos(a)*0.062, 0.12 + Math.sin(a)*0.062, 0).rotation.z = a; }   // teeth
-  at(sp, cylZ(0.02, 0.21, M.steel, 12), -0.14, 0.12, 0);
+  // latch (photo): a quarter-gear — a fan-shaped tab whose arc is cut with teeth, sticking up behind the sight fins
+  const LX = -0.14, LY = 0.06, LR = 0.1, A0 = Math.PI*0.32, A1 = Math.PI*0.82;
+  at(sp, rbox(0.08, 0.08, 0.14, 0.02, M.gunDark), -0.13, 0.04, 0);
+  { const fan = new THREE.Shape(); fan.moveTo(0, 0); fan.absarc(0, 0, LR, A0, A1, false); fan.lineTo(0, 0);
+    const m = extrude(fan, 0.14, M.gunDark, 0.006); m.position.set(LX, LY, -0.07); sp.add(m); }
+  for (let k=0;k<=9;k++){ const a = A0 + (A1 - A0)*k/9; at(sp, box(0.022, 0.014, 0.15, M.dsteel), LX + Math.cos(a)*(LR + 0.006), LY + Math.sin(a)*(LR + 0.006), 0).rotation.z = a; }   // teeth on the arc
+  at(sp, cylZ(0.016, 0.16, M.steel, 12), LX, LY, 0);
   tag(sp, 'latch');
   // field-strip choreography (photos), timed on S.ex 0→1: press the latch, the upper hinges open, the recoil-spring
   // assembly is drawn out of the back, the handle slides to the keyhole and comes out sideways, then the carrier with the
