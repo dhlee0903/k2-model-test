@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#ffffff">
+<title>K2 소총 시뮬레이터</title>
+<style>
+  :root { --bg1:#ffffff; --bg2:#e7eaef; --fg:#1d2430; --muted:#5b6575; --chip:#ffffffde; --on:#1d2430; --on-fg:#fff; --warn:#c2410c; --ok:#15803d; --fire:#b91c1c; }
+  * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  html, body, button { touch-action:manipulation; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#fff; color-scheme:light; }
+  body { background: radial-gradient(ellipse at 50% 35%, var(--bg1), var(--bg2)); color:var(--fg);
+         font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  body.range { background: linear-gradient(#8dbde6, #dcecf8 60%, #eef4f8); }
+  canvas { display:block; touch-action:none; }
+  #hud { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; pointer-events:none; }
+  #ammo { font-size:44px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
+  #ammo small { font-size:22px; color:var(--muted); font-weight:700; }
+  #ammoLbl { font-size:12px; color:var(--muted); margin-top:6px; letter-spacing:.03em; }
+  #status { margin-top:8px; font-size:13px; font-weight:700; max-width:56vw; }
+  #status.warn { color:var(--warn); } #status.ok { color:var(--ok); }
+  #right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  #sel { display:flex; gap:3px; background:var(--chip); padding:4px; border-radius:999px; box-shadow:0 1px 4px rgba(20,30,50,.14); pointer-events:auto; cursor:pointer; }
+  #sel span { padding:6px 11px; border-radius:999px; font-size:13px; font-weight:800; color:var(--muted); white-space:nowrap; }
+  #sel span.on { background:var(--on); color:var(--on-fg); }
+  #sel span.on.safe { background:var(--ok); }
+  #score { font-size:13px; font-weight:700; text-align:right; background:var(--chip); padding:6px 12px; border-radius:12px; box-shadow:0 1px 4px rgba(20,30,50,.14); }
+  #score[hidden] { display:none; }
+  .chip { pointer-events:auto; cursor:pointer; font-size:12px; font-weight:800; background:var(--chip); padding:6px 12px; border-radius:999px; box-shadow:0 1px 4px rgba(20,30,50,.14); }
+  #peep { position:fixed; inset:0; pointer-events:none; display:none;
+          background: radial-gradient(circle at 50% 50%, transparent 0, transparent 21vmin, rgba(18,20,24,.55) 25vmin, rgba(12,13,16,.94) 31vmin); }
+  body.range #peep { display:block; }
+  #pop { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.45); opacity:0; pointer-events:none; }
+  #pop.go { animation:pop .8s ease-out; }
+  @keyframes pop { 0% { opacity:1; transform:translate(-50%,-30%) scale(1.2); } 70% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-90%) scale(1); } }
+  /* view switch (top centre) */
+  #viewSeg { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:2px; padding:4px;
+             background:var(--chip); border-radius:999px; box-shadow:0 1px 6px rgba(20,30,50,.16); backdrop-filter:blur(10px); }
+  #viewSeg button { border:0; background:transparent; font:inherit; font-size:13px; font-weight:800; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+  #viewSeg button.on { background:var(--on); color:var(--on-fg); }
+  /* tool dock (right edge): action / attachments / view */
+  #dock { position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:4px; padding:8px;
+          background:var(--chip); border-radius:18px; box-shadow:0 2px 12px rgba(20,30,50,.16); backdrop-filter:blur(10px);
+          max-height:calc(100vh - 250px); overflow-y:auto; scrollbar-width:none; }
+  #dock::-webkit-scrollbar { display:none; }
+  #dock .grp { font-size:10px; font-weight:800; color:var(--muted); text-align:center; letter-spacing:.06em; margin:4px 0 1px; }
+  #dock .grp:first-child { margin-top:0; }
+  .tile { width:68px; min-height:50px; border:0; border-radius:12px; background:transparent; cursor:pointer; font:inherit; color:var(--fg);
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:4px 2px; }
+  .tile b { font-size:12px; font-weight:800; line-height:1.15; text-align:center; }
+  .tile kbd { font:600 10px ui-monospace, Consolas, monospace; color:var(--muted); border:1px solid #d5d9e0; border-radius:4px; padding:0 4px; }
+  .tile:hover { background:#eef1f5; }
+  .tile.on { background:var(--on); color:var(--on-fg); }
+  .tile.on kbd { color:#cbd5e1; border-color:#475569; }
+  /* fire button (bottom right) */
+  #fire { position:fixed; right:22px; bottom:calc(24px + env(safe-area-inset-bottom)); width:86px; height:86px; border-radius:50%; border:0;
+          background:var(--fire); color:#fff; font:inherit; font-size:17px; font-weight:900; cursor:pointer;
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; box-shadow:0 6px 18px rgba(185,28,28,.35); }
+  #fire kbd { font:600 10px ui-monospace, Consolas, monospace; opacity:.8; }
+  #fire:active { transform:scale(.94); }
+  #hint { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:130px; right:130px; text-align:center; font-size:12px; color:var(--muted); pointer-events:none; }
+  body.range #hint, body.range #ammoLbl { color:#334155; }
+  body.touch kbd { display:none; }
+  @media (max-width: 640px) {
+    #hud { left:12px; right:12px; }
+    #ammo { font-size:34px; } #ammo small { font-size:17px; }
+    #status { max-width:48vw; }
+    #sel span { padding:5px 8px; font-size:12px; }
+    #viewSeg { top:auto; bottom:calc(20px + env(safe-area-inset-bottom)); left:12px; transform:none; }
+    #viewSeg button { padding:9px 12px; }
+    /* phones: the dock becomes a swipeable row above the view switch, clear of the rifle */
+    #dock { top:auto; transform:none; left:8px; right:100px; bottom:calc(76px + env(safe-area-inset-bottom)); flex-direction:row; align-items:center;
+            max-height:none; overflow-x:auto; overflow-y:hidden; padding:5px; border-radius:16px; }
+    #dock .grp { display:none; }
+    .tile { width:auto; min-width:58px; min-height:42px; flex:0 0 auto; padding:4px 8px; }
+    .tile b { font-size:12px; white-space:nowrap; }
+    .tile b br { display:none; }
+    #fire { width:78px; height:78px; right:12px; bottom:calc(20px + env(safe-area-inset-bottom)); }
+    #hint { display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>
+    <div id="ammo">30<small> + 0</small></div>
+    <div id="ammoLbl">탄창 + 약실</div>
+    <div id="status"></div>
+  </div>
+  <div id="right">
+    <div id="sel" title="조정간 (Q)"><span>안전</span><span>단발</span><span>점사</span><span>연발</span></div>
+    <div id="gasChip" class="chip" title="가스조절기 (G)"></div>
+    <div id="score" hidden></div>
+  </div>
+</div>
+<div id="peep"></div>
+<div id="pop"></div>
+<div id="viewSeg"><button data-v="inspect" class="on">🔍 점검</button><button data-v="range">🎯 사격장</button></div>
+<div id="dock">
+  <div class="grp">조작</div>
+  <button class="tile" id="bCharge"><b>노리쇠</b><kbd>F</kbd></button>
+  <button class="tile" id="bMag"><b>탄창 분리</b><kbd>R</kbd></button>
+  <button class="tile" id="bNew"><b>새 탄창</b><kbd>N</kbd></button>
+  <div class="grp">부착</div>
+  <button class="tile" id="bBay"><b>대검</b><kbd>B</kbd></button>
+  <button class="tile" id="bStock"><b>개머리판<br>접기</b><kbd>V</kbd></button>
+  <div class="grp">보기</div>
+  <button class="tile" id="bClear"><b>투명</b><kbd>X</kbd></button>
+  <button class="tile" id="bDis"><b>분해</b><kbd>D</kbd></button>
+</div>
+<button id="fire"><span>발사</span><kbd>Space</kbd></button>
+<div id="hint"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ---------- renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, (innerWidth/innerHeight) || 1.6, 0.05, 2000);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 3; controls.maxDistance = 60;
+
+(function buildEnv(){
+  const env = new THREE.Scene();
+  const skyGeo = new THREE.SphereGeometry(50, 32, 16);
+  const cols = [], pos = skyGeo.attributes.position;
+  for (let i=0;i<pos.count;i++){
+    const h = THREE.MathUtils.smoothstep(pos.getY(i)/50, -0.4, 0.8);
+    const c = new THREE.Color(0x141619).lerp(new THREE.Color(0x8c939e), h);
+    cols.push(c.r, c.g, c.b);
+  }
+  skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  env.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ side:THREE.BackSide, vertexColors:true })));
+  const lightMat = new THREE.MeshBasicMaterial({ color:0xffffff });
+  [[0,30,0, 30,1,10],[25,10,10, 1,14,20],[-25,8,-8, 1,10,14],[0,6,-28, 18,8,1],[0,18,14, 60,1.2,2],[0,-6,20, 60,0.8,1.5]].forEach(([x,y,z,w,h,d])=>{
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lightMat); b.position.set(x,y,z); env.add(b);
+  });
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(env, 0.02).texture;
+})();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3d44, 0.3));
+const rim = new THREE.DirectionalLight(0xdfe8ff, 0.7); rim.position.set(-12, 8, -14); scene.add(rim);
+const key = new THREE.DirectionalLight(0xffffff, 1.55);
+key.position.set(6, 20, 14); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004;
+Object.assign(key.shadow.camera, { left:-12, right:12, top:12, bottom:-12, near:1, far:60 });
+scene.add(key, key.target);
+
+// ---------- materials ----------
+// procedural surface textures: parkerized grain on the metal, fine stipple on polymer, checkering on the grip
+function noiseTex(base, amp, rep, size=256){
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const g = cv.getContext('2d'), img = g.createImageData(size, size);
+  for (let i=0;i<img.data.length;i+=4){ const v = base + (Math.random()*2-1)*amp; img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255; }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); return t;
+}
+function checkerTex(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+  g.fillStyle = '#808080'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#202020'; g.lineWidth = 3;
+  for (let x=-64; x<128; x+=12){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x+64, 64); g.stroke(); g.beginPath(); g.moveTo(x+64, 0); g.lineTo(x, 64); g.stroke(); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 4); return t;
+}
+const parkMap = noiseTex(205, 14, 3), parkBump = noiseTex(128, 90, 6), polyBump = noiseTex(128, 60, 8), gripBump = checkerTex();
+parkMap.encoding = THREE.sRGBEncoding;
+// "shell" materials go see-through in clear mode; internals keep their own
+const M = {
+  gun:    new THREE.MeshStandardMaterial({ color:0x5a5d5a, map:parkMap, bumpMap:parkBump, bumpScale:0.0016, roughness:0.5, metalness:0.55, envMapIntensity:0.95 }),   // parkerized receivers
+  gunDark:new THREE.MeshStandardMaterial({ color:0x37393b, map:parkMap, bumpMap:parkBump, bumpScale:0.0014, roughness:0.4, metalness:0.7, envMapIntensity:1.1 }), // barrel, gas tube, sights
+  poly:   new THREE.MeshPhysicalMaterial({ color:0x09090a, roughness:0.48, clearcoat:0.3, clearcoatRoughness:0.3, bumpMap:polyBump, bumpScale:0.0012, envMapIntensity:0.45 }), // stock, handguard
+  gripPoly: new THREE.MeshPhysicalMaterial({ color:0x0c0c0d, roughness:0.6, clearcoat:0.2, clearcoatRoughness:0.5, bumpMap:gripBump, bumpScale:0.012, envMapIntensity:0.5 }),
+  mag:    new THREE.MeshStandardMaterial({ color:0x262829, map:parkMap, bumpMap:parkBump, bumpScale:0.0014, roughness:0.45, metalness:0.65, envMapIntensity:0.95 }),
+  rubber: new THREE.MeshStandardMaterial({ color:0x0c0c0d, roughness:0.9, bumpMap:polyBump, bumpScale:0.006 }),
+  steel:  new THREE.MeshStandardMaterial({ color:0xa7adb5, roughness:0.25, metalness:1, envMapIntensity:1.2 }),
+  dsteel: new THREE.MeshStandardMaterial({ color:0x55595f, roughness:0.32, metalness:1, envMapIntensity:1.1 }),
+  spring: new THREE.MeshStandardMaterial({ color:0xc9ced6, roughness:0.25, metalness:1 }),
+  follower: new THREE.MeshStandardMaterial({ color:0x4f6b3a, roughness:0.6 }),
+  black:  new THREE.MeshBasicMaterial({ color:0x050505 }),
+  blade:  new THREE.MeshStandardMaterial({ color:0x34373c, roughness:0.35, metalness:0.85, envMapIntensity:1.1 }),
+  grip:   new THREE.MeshStandardMaterial({ color:0x18191b, roughness:0.85 }),
+  brass:  new THREE.MeshStandardMaterial({ color:0xd4a64a, roughness:0.22, metalness:1, envMapIntensity:1.2 }),
+  copper: new THREE.MeshStandardMaterial({ color:0xb8733a, roughness:0.28, metalness:1 }),
+  flash:  new THREE.MeshBasicMaterial({ color:0xffc46b, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }),
+};
+const SHELL = [[M.gun, 0.16], [M.gunDark, 0.2], [M.poly, 0.14], [M.gripPoly, 0.18], [M.mag, 0.2], [M.rubber, 0.2], [M.grip, 0.3]];
+function setClear(on){
+  SHELL.forEach(([m, o])=>{ m.transparent = on; m.opacity = on ? o : 1; m.depthWrite = !on; m.side = on ? THREE.DoubleSide : THREE.FrontSide; m.needsUpdate = true; });
+  parts.portCover.forEach(o=>o.visible = !on);
+}
+
+function shadowed(o){ o.traverse(m=>{ if (m.isMesh){ m.castShadow = true; m.receiveShadow = true; } }); return o; }
+function lathe(points, mat, seg=32){ return shadowed(new THREE.Mesh(new THREE.LatheGeometry(points.map(([r,y])=>new THREE.Vector2(r,y)), seg), mat)); }
+function rbox(w, h, d, r, mat){
+  r = Math.min(r, w/2-0.001, h/2-0.001, d/2-0.001);
+  const W = w-2*r, H = h-2*r, c = Math.min(r*0.6, W/2, H/2), x = -W/2, y = -H/2;
+  const s = new THREE.Shape();
+  s.moveTo(x+c, y); s.lineTo(x+W-c, y); s.quadraticCurveTo(x+W, y, x+W, y+c);
+  s.lineTo(x+W, y+H-c); s.quadraticCurveTo(x+W, y+H, x+W-c, y+H);
+  s.lineTo(x+c, y+H); s.quadraticCurveTo(x, y+H, x, y+H-c);
+  s.lineTo(x, y+c); s.quadraticCurveTo(x, y, x+c, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth:Math.max(d-2*r, 0.001), bevelEnabled:true, bevelThickness:r, bevelSize:r, bevelSegments:3, curveSegments:6 });
+  g.translate(0, 0, -Math.max(d-2*r, 0.001)/2);
+  return shadowed(new THREE.Mesh(g, mat));
+}
+function box(w, h, d, mat){ return shadowed(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)); }
+function cylX(r, len, mat, seg=24){ const m = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat)); m.rotation.z = Math.PI/2; return m; }
+function cylY(r, len, mat, seg=24){ return shadowed(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat)); }
+function cylZ(r, len, mat, seg=24){ const m = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat)); m.rotation.x = Math.PI/2; return m; }
+function at(parent, obj, x, y, z){ obj.position.set(x, y, z); parent.add(obj); return obj; }
+function extrude(shape, depth, mat, bevel=0.02){
+  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:bevel>0, bevelThickness:bevel, bevelSize:bevel, bevelSegments:2, curveSegments:24 });
+  return shadowed(new THREE.Mesh(g, mat));
+}
+// side profile (XY) extruded across Z, centred on z=0
+function profile(shape, depth, mat, bevel){ const m = extrude(shape, depth, mat, bevel); m.position.z = -depth/2; return m; }
+function shape(pts){ const s = new THREE.Shape(); s.moveTo(...pts[0]); pts.slice(1).forEach(p=>p.length === 4 ? s.quadraticCurveTo(...p) : s.lineTo(...p)); return s; }
+function spring(pos, vel, target, k, c, dt){ const a = -k*(pos-target) - c*vel; vel += a*dt; pos += vel*dt; return [pos, vel]; }
+class Helix extends THREE.Curve {
+  constructor(r, n){ super(); this.r = r; this.n = n; }
+  getPoint(t, out = new THREE.Vector3()){ const a = t*Math.PI*2*this.n; return out.set(Math.cos(a)*this.r, t, Math.sin(a)*this.r); }
+}
+// unit-length coil spring along +Y; scale.y sets its length
+function coil(r, turns, wire, mat){ return shadowed(new THREE.Mesh(new THREE.TubeGeometry(new Helix(r, turns), turns*16, wire, 6, false), mat)); }
+function label(txt, color='#f2f2f2', size=0.13){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'); g.fillStyle = color; g.font = 'bold 46px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 32, 36);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
+  return new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map:t, transparent:true, depthWrite:false }));
+}
+function tagSprite(txt){
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.fillStyle = 'rgba(29,36,48,.88)'; g.beginPath(); g.roundRect ? g.roundRect(4, 8, 248, 48, 24) : g.rect(4, 8, 248, 48); g.fill();
+  g.fillStyle = '#fff'; g.font = 'bold 30px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128, 34);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, transparent:true, depthTest:false, opacity:0 }));
+  sp.scale.set(1.0, 0.25, 1); sp.renderOrder = 10; sp.userData.label = true;
+  return sp;
+}
+function word(txt, color='#e9e9e9', h=0.085){
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+  const g = cv.getContext('2d'); g.fillStyle = color; g.font = 'bold 44px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 64, 36);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
+  return new THREE.Mesh(new THREE.PlaneGeometry(h*2, h), new THREE.MeshBasicMaterial({ map:t, transparent:true, depthWrite:false }));
+}
+// handguard cross-section: round with deep lengthwise flutes
+function fluted(R, depth, n){
+  const s = new THREE.Shape(), N = n*16;
+  for (let i=0;i<=N;i++){
+    const a = i/N*Math.PI*2, r = R - depth*Math.pow(Math.max(0, Math.cos(a*n)), 8);
+    i ? s.lineTo(Math.cos(a)*r, Math.sin(a)*r) : s.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+  }
+  return s;
+}
+// 5.56 mm cartridge (live = with bullet), base at y=0 pointing +y
+function makeRound(live){
+  const g = new THREE.Group();
+  g.add(lathe([[0,0],[0.052,0],[0.052,0.02],[0.044,0.03],[0.05,0.045],[0.05,0.36],[0.033,0.42],[0.031,0.52],[0,0.52]], M.brass, 16));
+  if (live) at(g, lathe([[0,0],[0.029,0],[0.029,0.1],[0.02,0.2],[0.006,0.27],[0,0.28]], M.copper, 16), 0, 0.5, 0);
+  return g;
+}
+
+// ---------- rifle: dimensions taken from a side photo of the K2 ----------
+// muzzle +x, up +y, right side +z; 1 unit ≈ 85 mm, bore line y = 0.38
+const SIGHT_Y = 1.02, TRAVEL = 1.0, BORE = 0.38;
+const gun = new THREE.Group(), rec = new THREE.Group(); gun.add(rec);
+const parts = { portCover:[] };
+function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
+
+(function buildRifle(){
+  // --- upper receiver: raised rear-sight hump, sloped nose, side ledge ---
+  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,0.62],[1.18,0.76],[0.32,0.77],[0.14,0.86],[-0.95,0.88],[-1.12,0.82],[-1.25,0.66]]), 0.6, M.gun, 0.035));
+  [0.322, -0.322].forEach(z=>at(rec, rbox(2.35, 0.05, 0.03, 0.012, M.gun), 0.02, 0.27, z));
+  [0.322, -0.322].forEach(z=>at(rec, rbox(0.9, 0.04, 0.025, 0.01, M.gun), 0.65, 0.73, z));
+  // rear sight: knurled drum on the hump, aperture on the sight line
+  const rs = new THREE.Group(); rec.add(rs); parts.rearSight = rs;
+  at(rs, rbox(0.52, 0.08, 0.46, 0.03, M.gun), -0.55, 0.91, 0);
+  at(rs, cylZ(0.13, 0.3, M.gunDark, 32), -0.55, 1.0, 0);
+  for (let k=-3;k<=3;k++) at(rs, new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.007, 4, 32), M.gunDark), -0.55, 1.0, k*0.042);
+  at(rs, cylZ(0.05, 0.36, M.dsteel, 16), -0.55, 1.0, 0);
+  at(rs, cylX(0.022, 0.02, M.black, 12), -0.685, SIGHT_Y, 0);
+  // ejection port + charging-handle slot (right side)
+  const port = at(rec, box(0.85, 0.16, 0.02, M.black), 0.45, 0.42, 0.335);
+  const slot = at(rec, box(1.55, 0.05, 0.02, M.black), 0.25, 0.65, 0.335);
+  parts.portCover.push(port, slot);
+  // --- lower receiver: flared magwell, takedown pins, magazine release with fence ---
+  rec.add(profile(shape([[-1.25,0.14],[1.3,0.14],[1.3,-0.08],[1.24,-0.42],[1.32,-0.55],[0.06,-0.55],[0.06,-0.44],[-0.02,-0.36],[-0.5,-0.36],[-0.95,-0.33],[-1.25,-0.1]]), 0.56, M.gun, 0.035));
+  at(rec, rbox(1.32, 0.06, 0.64, 0.02, M.gun), 0.69, -0.53, 0);
+  [[-1.02,0.02],[1.12,0.02]].forEach(([x,y])=>at(rec, cylZ(0.05, 0.64, M.dsteel, 16), x, y, 0));
+  [[-0.15,-0.12],[-0.38,-0.12]].forEach(([x,y])=>at(rec, cylZ(0.03, 0.6, M.dsteel, 12), x, y, 0));
+  at(rec, cylZ(0.055, 0.08, M.dsteel), 0.2, -0.18, 0.3);
+  at(rec, new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 20), M.gun), 0.2, -0.18, 0.3);
+  rec.add(profile(shape([[-0.5,-0.36],[-0.5,-0.64],[-0.5,-0.7,-0.43,-0.7],[0.02,-0.7],[0.08,-0.7,0.08,-0.63],[0.08,-0.44],[0.02,-0.44],[0.02,-0.63],[-0.43,-0.63],[-0.43,-0.36]]), 0.14, M.gun, 0.015));
+  const trig = new THREE.Group(); trig.position.set(-0.16, -0.34, 0);
+  trig.add(profile(shape([[0.03,0.02],[-0.06,-0.12,0.05,-0.25],[0.09,-0.23],[0.0,-0.13,0.08,0.02]]), 0.07, M.dsteel, 0.01));
+  rec.add(trig); parts.trigger = trig;
+  // --- pistol grip: A2-style rake with beavertail, finger bump, checkered panels ---
+  rec.add(profile(shape([[-0.34,-0.34],[-0.9,-0.34],[-0.98,-0.42],[-1.38,-1.22],[-1.42,-1.36,-1.28,-1.42],[-0.98,-1.46],[-0.84,-1.44,-0.86,-1.32],[-0.68,-0.98],[-0.56,-0.82,-0.6,-0.72],[-0.42,-0.42]]), 0.42, M.gripPoly, 0.05));
+  // --- selector (left): knob at the narrow end, plate bulges into a lobe and comes to a point ---
+  // seen from the left the muzzle is to the viewer's left: 안전 = tip toward the muzzle, 단발 up-forward, 점사 down-forward, 연발 straight down
+  const SX = -0.52, SY = -0.1;
+  const sel = new THREE.Group(); sel.position.set(SX, SY, -0.31);
+  const cam = new THREE.Shape();
+  cam.moveTo(0, 0.07); cam.absarc(0, 0, 0.07, Math.PI/2, Math.PI*1.5, false);
+  cam.quadraticCurveTo(0.08, -0.12, 0.17, -0.115); cam.quadraticCurveTo(0.29, -0.1, 0.33, 0);
+  cam.quadraticCurveTo(0.29, 0.1, 0.17, 0.115); cam.quadraticCurveTo(0.08, 0.12, 0, 0.07);
+  const selPlate = extrude(cam, 0.022, M.dsteel, 0.008); selPlate.position.z = -0.022; sel.add(selPlate);
+  at(sel, cylZ(0.06, 0.11, M.dsteel, 28), 0, 0, -0.07);
+  at(sel, cylZ(0.063, 0.015, M.steel, 28), 0, 0, -0.125);
+  rec.add(sel); parts.selector = sel;
+  parts.SEL_ANG = [0, Math.PI*0.31, -Math.PI*0.31, -Math.PI*0.5];
+  [['안전', 0, 0.45], ['단발', 1, 0.32], ['점사', 2, 0.32], ['연발', 3, 0.27]].forEach(([t, i, r])=>{
+    const w = word(t, i ? '#e6e6e6' : '#9be7a7', 0.07); w.rotation.y = Math.PI;
+    const a = parts.SEL_ANG[i];
+    w.position.set(SX + Math.cos(a)*r, SY + Math.sin(a)*r, -0.345); rec.add(w); tag(w, 'selector');   // clear of the wider upper receiver
+  });
+  tag(sel, 'selector');
+  // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
+  at(rec, rbox(0.28, 0.86, 0.64, 0.05, M.gun), -1.38, 0.3, 0);
+  [0.08, 0.38, 0.62].forEach(y=>at(rec, cylY(0.07, 0.2, M.gunDark, 20), -1.5, y, 0.31));
+  const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.31); rec.add(hinge); parts.stock = hinge;
+  const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.31); hinge.add(sg);
+  sg.add(profile(shape([[-1.52,0.5],[-4.12,0.6],[-4.3,0.6,-4.3,0.44],[-4.28,-0.62],[-4.26,-0.78,-4.1,-0.78],[-3.92,-0.78],[-3.3,-0.64,-2.9,-0.38],[-2.4,-0.08,-1.52,-0.02]]), 0.42, M.poly, 0.07));
+  at(sg, rbox(0.1, 1.42, 0.5, 0.05, M.rubber), -4.36, -0.09, 0);
+  at(sg, cylZ(0.035, 0.5, M.dsteel, 12), -4.0, -0.6, 0);
+  tag(hinge, 'stock');
+  // --- deeply fluted handguard, end caps, exposed gas tube over the barrel ---
+  const hg = extrude(fluted(0.345, 0.08, 12), 1.86, M.poly, 0.02); hg.rotation.y = Math.PI/2; hg.position.set(1.33, 0.46, 0); rec.add(hg);
+  at(rec, cylX(0.37, 0.06, M.gunDark, 32), 1.31, 0.46, 0);
+  at(rec, cylX(0.31, 0.44, M.gunDark, 32), 3.4, 0.46, 0);
+  at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.24, 0.46, 0);
+  at(rec, cylX(0.322, 0.04, M.gunDark, 32), 3.58, 0.46, 0);
+  at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
+  at(rec, cylX(0.06, 2.3, M.gunDark, 16), 2.45, 0.64, 0);                // gas tube (under the handguard)
+  at(rec, cylX(0.08, 5.1, M.gunDark, 28), 3.85, BORE, 0);               // barrel
+  at(rec, cylX(0.12, 0.3, M.gunDark, 24), 1.25, BORE, 0);               // barrel extension / chamber
+  // --- gas block + ringed front sight + sling swivel + bayonet lug ---
+  at(rec, rbox(0.34, 0.44, 0.26, 0.04, M.gunDark), 4.97, 0.5, 0);
+  // gas regulator: plug in the gas block with a rotating head (O 차단 / Ⅰ 정상 / Ⅱ 악조건)
+  const gas = new THREE.Group(); gas.position.set(5.16, 0.64, 0); rec.add(gas); parts.gas = gas;
+  at(gas, cylX(0.075, 0.12, M.steel, 20), 0, 0, 0);
+  at(gas, rbox(0.1, 0.2, 0.17, 0.04, M.dsteel), 0.1, 0, 0);
+  at(gas, cylX(0.04, 0.08, M.dsteel, 16), 0.17, 0.05, 0);
+  const arrow = at(gas, box(0.01, 0.025, 0.08, new THREE.MeshBasicMaterial({ color:0xf5c518 })), 0.152, -0.05, 0);
+  parts.GAS_ANG = [-Math.PI*0.5, 0, Math.PI*0.5];
+  [['O', 0], ['Ⅰ', 1], ['Ⅱ', 2]].forEach(([t, i])=>{
+    const l = label(t, i === 1 ? '#f5c518' : '#e9e9e9', 0.08); l.rotation.y = Math.PI/2;
+    const a = parts.GAS_ANG[i];   // arrow points down at 0°, so mark where it lands for each setting
+    l.position.set(5.152, 0.64 - Math.cos(a)*0.15, -Math.sin(a)*0.15);
+    rec.add(l); tag(l, 'gas');
+  });
+  tag(gas, 'gas');
+  at(rec, rbox(0.12, 0.14, 0.12, 0.02, M.gunDark), 4.97, 0.78, 0);
+  at(rec, box(0.035, 0.2, 0.035, M.gunDark), 4.97, SIGHT_Y - 0.1, 0);
+  const hood = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.034, 12, 32), M.gunDark); hood.rotation.y = Math.PI/2; at(rec, shadowed(hood), 4.97, 1.03, 0);
+  at(rec, box(0.06, 0.12, 0.05, M.gunDark), 4.62, 0.27, 0);
+  at(rec, shadowed(new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.016, 8, 20), M.dsteel)), 4.62, 0.14, 0);
+  at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
+  // --- slotted flash hider ---
+  at(rec, cylX(0.1, 0.75, M.gunDark, 28), 6.79, BORE, 0);
+  at(rec, cylX(0.11, 0.05, M.gunDark, 28), 6.42, BORE, 0);
+  for (let k=0;k<5;k++){ const a = k*Math.PI*2/5 + 0.3; at(rec, box(0.45, 0.025, 0.02, M.black), 6.86, BORE + Math.sin(a)*0.1, Math.cos(a)*0.1).rotation.x = a; }
+  parts.muzzle = at(rec, new THREE.Object3D(), 7.17, BORE, 0);
+
+  // === internals (AR-18 lineage: block carrier, rotating bolt, twin recoil-spring guide rods; K2 long-stroke piston) ===
+  const carrier = new THREE.Group(); rec.add(carrier); parts.carrier = carrier;
+  // each piece is its own group so disassembly mode can lift it out: [name, group, exploded offset]
+  parts.explode = [];
+  function piece(name, x, y, z, off, labelAt = [0, 0.3, 0], parent = carrier){
+    const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
+    const sp = tagSprite(name); sp.position.set(...labelAt); g.add(sp);
+    parts.explode.push({ g, base:g.position.clone(), off:new THREE.Vector3(...off), label:sp });
+    return g;
+  }
+  // carrier body: block with cam-pin track and firing-pin bore
+  const body = piece('노리쇠뭉치', 0.6, 0.45, 0, [-0.3, 1.9, 0], [0, 0.32, 0]);
+  at(body, rbox(0.95, 0.26, 0.24, 0.03, M.steel), 0, 0, 0);
+  at(body, box(0.26, 0.08, 0.01, M.black), 0.15, 0, 0.125);
+  at(body, box(0.18, 0.06, 0.01, M.black), -0.25, 0.04, 0.125);
+  // rotating bolt: lugged head, extractor, tail
+  const bolt = piece('노리쇠', 1.0, BORE, 0, [1.4, 1.95, 0], [0, 0.25, 0]);
+  at(bolt, cylX(0.068, 0.5, M.dsteel, 16), -0.1, 0, 0);
+  at(bolt, cylX(0.085, 0.1, M.dsteel, 16), 0.2, 0, 0);
+  for (let k=0;k<7;k++){ const a = k*Math.PI*2/7; at(bolt, box(0.06, 0.035, 0.035, M.dsteel), 0.26, Math.sin(a)*0.085, Math.cos(a)*0.085); }
+  at(bolt, box(0.16, 0.03, 0.03, M.steel), 0.15, 0.08, 0.04);
+  at(bolt, cylY(0.03, 0.18, M.black, 10), -0.15, 0, 0);
+  // firing pin: long thin striker with a collar
+  const fpin = piece('공이', 0.75, BORE, 0, [-1.5, 2.6, 0], [0, 0.18, 0]);
+  at(fpin, cylX(0.016, 0.62, M.steel, 10), 0, 0, 0);
+  at(fpin, cylX(0.035, 0.04, M.steel, 14), -0.12, 0, 0);
+  at(fpin, cylX(0.025, 0.06, M.steel, 14), -0.29, 0, 0);
+  at(fpin, cylX(0.008, 0.04, M.steel, 8), 0.33, 0, 0);
+  // cam pin: turns the bolt as the carrier moves
+  const cpin = piece('캠핀', 0.85, 0.47, 0, [0.75, 2.4, 0], [0, 0.22, 0]);
+  at(cpin, cylY(0.035, 0.18, M.dsteel, 14), 0, 0, 0);
+  at(cpin, box(0.09, 0.05, 0.09, M.dsteel), 0, 0.1, 0);
+  // firing-pin retaining pin
+  const rpin = piece('공이고정핀', 0.45, BORE + 0.05, 0, [0.35, 2.6, 0], [0, 0.18, 0]);
+  at(rpin, cylZ(0.012, 0.26, M.steel, 8), 0, 0, 0);
+  at(rpin, cylZ(0.022, 0.02, M.steel, 10), 0, 0, 0.12);
+  // operating rod + piston head (long-stroke) and the link to the charging handle
+  const rod = piece('가스피스톤', 3.0, 0.64, 0, [0, 3.1, 0], [0, 0.18, 0]);
+  at(rod, cylX(0.03, 3.85, M.steel, 12), 0, 0, 0);
+  at(rod, cylX(0.055, 0.14, M.dsteel, 16), 1.9, 0, 0);
+  at(rod, rbox(0.25, 0.14, 0.12, 0.02, M.steel), -2.0, 0, 0);
+  const handle = piece('장전손잡이', 1.0, 0.62, 0.3, [0.9, 1.35, 1.4], [0, 0.25, 0.2]);
+  at(handle, cylZ(0.035, 0.24, M.gun), 0, 0, 0.1);
+  at(handle, cylZ(0.09, 0.12, M.gun), 0, 0, 0.24);
+  tag(shadowed(handle), 'handle');
+  // twin guide rods + recoil springs behind the carrier
+  parts.springs = [];
+  const sp = piece('복좌용수철', -1.12, 0.55, 0, [-0.7, 1.9, 0], [0.55, 0.25, 0], rec);
+  [0.06, -0.06].forEach(z=>{
+    at(sp, cylX(0.014, 1.0, M.steel, 8), 0.47, 0, z);
+    const c = coil(0.04, 14, 0.008, M.spring); c.rotation.z = -Math.PI/2; c.position.set(0, 0, z); sp.add(c); parts.springs.push(c);
+  });
+  at(sp, box(0.06, 0.18, 0.24, M.steel), -0.02, 0, 0);                        // spring end plate
+  // hammer (cocked = leaning back) and a chambered round
+  const hammer = new THREE.Group(); hammer.position.set(-0.25, -0.02, 0); rec.add(hammer); parts.hammer = hammer;
+  at(hammer, rbox(0.1, 0.36, 0.08, 0.02, M.dsteel), 0, 0.17, 0);
+  at(hammer, rbox(0.16, 0.08, 0.08, 0.02, M.dsteel), 0.03, 0.33, 0);
+  const ch = makeRound(true); ch.rotation.z = -Math.PI/2; ch.position.set(1.28, BORE, 0); rec.add(ch); parts.chamberRound = ch;
+  // bolt strip seen through the ejection port when the shell is opaque
+  const strip = at(rec, box(0.85, 0.12, 0.02, M.steel), 0.45, 0.42, 0.34); parts.bolt = strip;
+  parts.portCover.push(strip);
+
+  // --- magazine: shell + rounds / follower / spring inside ---
+  const mag = new THREE.Group(); rec.add(mag); parts.mag = mag;
+  mag.add(profile(shape([[0.2,-0.3],[1.14,-0.3],[1.2,-1.1,1.34,-1.85],[0.6,-1.95],[0.44,-1.1,0.2,-0.3]]), 0.3, M.mag, 0.03));
+  [0.165, -0.165].forEach(z=>[0.42, 0.72, 0.98].forEach(x=>{
+    const rib = profile(shape([[x-0.03,-0.6],[x+0.03,-0.6],[x+0.13,-1.75],[x+0.07,-1.75]]), 0.02, M.mag, 0.008); rib.position.z = z - 0.01; mag.add(rib);
+  }));
+  const plate = at(mag, rbox(0.82, 0.08, 0.36, 0.03, M.mag), 0.97, -1.92, 0); plate.rotation.z = 0.13;
+  // feed lips curl over the outer edge of the top round: the open gap shows which side it sits on
+  [0.115, -0.115].forEach(z=>at(mag, rbox(0.66, 0.04, 0.075, 0.015, M.mag), 0.62, -0.26, z));
+  const MTOP = new THREE.Vector2(0.66, -0.31), MBOT = new THREE.Vector2(0.95, -1.82), STEP = 0.05;
+  parts.magRounds = [];
+  const stack = new THREE.Group(); mag.add(stack); parts.stack = stack;
+  for (let i=0;i<28;i++){
+    const t = i*STEP/(MTOP.y - MBOT.y);
+    const r = makeRound(true); r.rotation.z = -Math.PI/2;
+    r.position.set(MTOP.x + (MBOT.x - MTOP.x)*t - 0.38, MTOP.y - i*STEP, i % 2 ? 0.05 : -0.05);
+    stack.add(r); parts.magRounds.push(r);
+  }
+  const follower = at(stack, rbox(0.7, 0.06, 0.22, 0.02, M.follower), 0.7, -0.4, 0); parts.follower = follower;
+  // the round being stripped from the magazine into the chamber
+  const fr = makeRound(true); fr.rotation.z = -Math.PI/2; fr.visible = false; rec.add(fr); parts.feedRound = fr;
+  const mspring = coil(0.11, 9, 0.012, M.spring); mag.add(mspring); parts.magSpring = mspring;
+  parts.MTOP = MTOP; parts.MBOT = MBOT; parts.MSTEP = STEP;
+  tag(mag, 'mag');
+
+  // --- M7-style bayonet: muzzle ring over the flash hider, pommel latches on the bayonet lug ---
+  const bay = new THREE.Group(); rec.add(bay); parts.bayonet = bay;
+  const gcv = document.createElement('canvas'); gcv.width = 128; gcv.height = 32; const gg = gcv.getContext('2d');
+  gg.fillStyle = '#2a2b2e'; gg.fillRect(0, 0, 128, 32); gg.strokeStyle = '#0b0b0c'; gg.lineWidth = 2;
+  for (let x=-32; x<160; x+=8){ gg.beginPath(); gg.moveTo(x, 0); gg.lineTo(x+32, 32); gg.stroke(); gg.beginPath(); gg.moveTo(x+32, 0); gg.lineTo(x, 32); gg.stroke(); }
+  M.grip.map = new THREE.CanvasTexture(gcv); M.grip.map.wrapS = M.grip.map.wrapT = THREE.RepeatWrapping; M.grip.map.repeat.set(3, 1);
+  bay.add(profile(shape([[6.86,-0.02],[8.4,-0.02],[8.78,0.04,8.98,0.18],[8.66,0.2],[8.5,0.26],[6.86,0.26]]), 0.045, M.blade, 0.006));
+  at(bay, box(1.3, 0.02, 0.05, M.black), 7.55, 0.16, 0);                                   // fuller
+  const edge = profile(shape([[6.95,-0.025],[8.4,-0.025],[8.78,0.035,8.98,0.18],[8.9,0.17],[8.72,0.05,8.4,0.01],[6.95,0.01]]), 0.02, M.steel, 0.004); bay.add(edge);
+  at(bay, box(0.06, 0.6, 0.16, M.blade), 6.83, 0.17, 0);                                   // crossguard
+  const mring = new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.028, 10, 24), M.blade); mring.rotation.y = Math.PI/2; at(bay, shadowed(mring), 6.83, BORE, 0);
+  at(bay, rbox(1.42, 0.24, 0.2, 0.07, M.grip), 6.07, 0.11, 0);                             // checkered grip
+  [5.78, 6.36].forEach(x=>[0.105, -0.105].forEach(z=>at(bay, cylZ(0.03, 0.01, M.steel, 12), x, 0.11, z)));
+  at(bay, rbox(0.24, 0.27, 0.19, 0.05, M.blade), 5.28, 0.13, 0);                            // pommel + latch
+  at(bay, box(0.06, 0.1, 0.06, M.steel), 5.18, 0.2, 0.1);
+  tag(bay, 'bayonet');
+
+  // --- muzzle flash + light ---
+  const fl = new THREE.Group(); parts.muzzle.add(fl); parts.flash = fl;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.1, 14, 1, true), M.flash); cone.rotation.z = -Math.PI/2; cone.position.x = 0.5; fl.add(cone);
+  const cross = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), M.flash); fl.add(cross);
+  const cross2 = cross.clone(); cross2.rotation.x = Math.PI/2; fl.add(cross2);
+  parts.flashSide = [cross, cross2];
+  const light = new THREE.PointLight(0xffb35c, 0, 8); fl.add(light); parts.flashLight = light;
+  rec.traverse(o=>{ if (!o.userData.part) o.userData.part = 'body'; });
+  rec.traverse(o=>{ if (o.isSprite) o.raycast = ()=>{}; });
+
+  // split off the upper half (receiver, barrel, handguard, sights, bolt group) so it can hinge open
+  // on the front takedown pin like a field strip; lower receiver, grip, trigger group, stock and magazine stay put
+  const upper = new THREE.Group(); upper.position.set(1.12, 0.02, 0); parts.upper = upper;
+  const keep = new Set([parts.feedRound, parts.mag, parts.stock, parts.hammer, parts.trigger, parts.selector]);
+  const b3 = new THREE.Box3(), c3 = new THREE.Vector3();
+  rec.updateMatrixWorld(true);        // the rifle still sits at the origin here, so world space == rifle space
+  [...rec.children].forEach(ch=>{
+    if (keep.has(ch) || ch.userData.part === 'selector') return;
+    b3.setFromObject(ch); if (b3.isEmpty()) c3.copy(ch.position); else b3.getCenter(c3);
+    const lower = (c3.y < 0.14 && c3.x < 1.4) || c3.x < -1.27;
+    if (!lower) upper.attach(ch);
+  });
+  rec.add(upper);
+})();
+
+// magazine contents follow the round count: rounds stacked from the top, follower and spring below
+function layoutMag(count){
+  const n = Math.min(count, parts.magRounds.length), { MTOP, MBOT, MSTEP } = parts;
+  // double stack: rounds alternate sides counted from the bottom, so the top one flips each shot (even count = 우상탄)
+  parts.magRounds.forEach((r, i)=>{ r.visible = i < n; r.position.z = (count - i) % 2 === 0 ? 0.05 : -0.05; });
+  const fy = MTOP.y - n*MSTEP - 0.05, t = (MTOP.y - fy)/(MTOP.y - MBOT.y);
+  parts.follower.position.set(MTOP.x + (MBOT.x - MTOP.x)*t + 0.02, fy, 0);
+  parts.follower.rotation.z = 0.12;
+  const bottom = MBOT.y + 0.02;
+  parts.magSpring.position.set(MTOP.x + (MBOT.x - MTOP.x)*t + 0.08, bottom, 0);
+  parts.magSpring.scale.y = Math.max(0.05, fy - bottom - 0.03);
+}
+
+// ---------- stage (inspect view) ----------
+const holder = new THREE.Group(); scene.add(holder);
+holder.add(gun);
+const GUN_X = -1.45;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({ opacity:0.16 }));
+ground.rotation.x = -Math.PI/2; ground.position.y = -3.4; ground.receiveShadow = true; scene.add(ground);
+
+// ---------- range ----------
+const RANGE_GROUND = -17, TARGET_X = 200, TSIZE = 14;
+const range = new THREE.Group(); range.visible = false; scene.add(range);
+const aim = new THREE.Group(); aim.rotation.order = 'YZX'; scene.add(aim);
+let targetCanvas, targetTex, target;
+(function buildRange(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 512; const g = cv.getContext('2d');
+  g.fillStyle = '#a7b98a'; g.fillRect(0, 0, 512, 512);
+  for (let i=0;i<300;i++){ g.fillStyle = `rgba(${90+Math.random()*60|0},${110+Math.random()*50|0},${60+Math.random()*30|0},.5)`; g.fillRect(Math.random()*512, Math.random()*512, 6, 6); }
+  const gt = new THREE.CanvasTexture(cv); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(40, 40); gt.encoding = THREE.sRGBEncoding;
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color:0x8fa36a, map:gt, roughness:1 }));
+  grass.rotation.x = -Math.PI/2; grass.position.y = RANGE_GROUND; range.add(grass);
+  const berm = new THREE.Mesh(new THREE.BoxGeometry(30, 40, 400), new THREE.MeshStandardMaterial({ color:0x9a7b55, roughness:1 }));
+  berm.position.set(TARGET_X + 40, RANGE_GROUND + 14, 0); berm.rotation.z = 0.5; range.add(berm);
+  targetCanvas = document.createElement('canvas'); targetCanvas.width = targetCanvas.height = 512;
+  drawTarget();
+  targetTex = new THREE.CanvasTexture(targetCanvas); targetTex.encoding = THREE.sRGBEncoding;
+  target = new THREE.Mesh(new THREE.PlaneGeometry(TSIZE, TSIZE), new THREE.MeshStandardMaterial({ map:targetTex, roughness:0.9 }));
+  target.rotation.y = -Math.PI/2; target.position.set(TARGET_X, 0, 0); range.add(target);
+  const wood = new THREE.MeshStandardMaterial({ color:0x8a6a45, roughness:0.9 });
+  [-6, 6].forEach(z=>{ const p = new THREE.Mesh(new THREE.BoxGeometry(0.8, 26, 0.8), wood); p.position.set(TARGET_X + 0.6, RANGE_GROUND + 11, z); range.add(p); });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, TSIZE + 1, TSIZE + 1), wood); back.position.set(TARGET_X + 0.3, 0, 0); range.add(back);
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 30), new THREE.MeshStandardMaterial({ color:0x6b7280, roughness:0.8 }));
+  bench.position.set(4, -4.5, 0); range.add(bench);
+})();
+function drawTarget(){
+  const g = targetCanvas.getContext('2d'), C = 256;
+  g.fillStyle = '#f4efe2'; g.fillRect(0, 0, 512, 512);
+  for (let s=1; s<=10; s++){
+    const r = (11 - s) * 24;
+    g.beginPath(); g.arc(C, C, r, 0, Math.PI*2);
+    g.fillStyle = s >= 7 ? '#1b1b1b' : '#f4efe2'; g.fill();
+    g.strokeStyle = s >= 7 ? '#f4efe2' : '#1b1b1b'; g.lineWidth = 2; g.stroke();
+    if (s < 10){ g.fillStyle = s >= 7 ? '#f4efe2' : '#1b1b1b'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.fillText(s, C, C - r + 18); }
+  }
+}
+
+// ---------- audio ----------
+let actx, out;
+function ac(){
+  if (!actx){
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    out = actx.createDynamicsCompressor(); out.threshold.value = -10; out.ratio.value = 6; out.connect(actx.destination);
+  }
+  return actx;
+}
+function noiseBuf(dur, curve){
+  const a = ac(), len = Math.floor(a.sampleRate*dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i=0;i<len;i++) d[i] = (Math.random()*2-1) * (curve ? Math.pow(1-i/len, curve) : 1);
+  return buf;
+}
+function burst({ freq=3000, q=3, vol=0.6, dur=0.03, curve=6, type='bandpass', delay=0, sweep }){
+  const a = ac(), t = a.currentTime + delay;
+  const src = a.createBufferSource(); src.buffer = noiseBuf(dur, curve);
+  const f = a.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+  if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + dur);
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(f).connect(g).connect(out); src.start(t);
+}
+function tone(freq, vol, dur, type='triangle', delay=0, endFreq){
+  const a = ac(), t = a.currentTime + delay;
+  const o = a.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t+dur);
+  const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(out); o.start(t); o.stop(t+dur+0.01);
+}
+const SND = {
+  shot(){ burst({ freq:4000, q:0.4, vol:1, dur:0.05, curve:2, type:'highpass' });
+          burst({ freq:2600, q:0.5, vol:1.2, dur:0.38, curve:3, type:'lowpass', sweep:220 });
+          tone(95, 1, 0.2, 'sine', 0, 38); burst({ freq:900, q:1, vol:0.25, dur:0.6, curve:2, type:'lowpass', delay:0.05, sweep:150 }); },
+  bolt(v=0.5){ burst({ freq:1900, q:2, vol:v, dur:0.035 }); tone(620, v*0.3, 0.05, 'square'); },
+  click(){ burst({ freq:3600, q:4, vol:0.45, dur:0.02 }); tone(2100, 0.12, 0.03); },
+  safe(){ burst({ freq:2500, q:3, vol:0.35, dur:0.025 }); },
+  magOut(){ burst({ freq:900, q:1.5, vol:0.5, dur:0.06, curve:4 }); tone(320, 0.2, 0.06, 'square'); },
+  magIn(){ burst({ freq:1300, q:1.5, vol:0.7, dur:0.05, curve:4 }); burst({ freq:3000, q:3, vol:0.4, dur:0.02, delay:0.05 }); },
+  clink(v){ tone(4200 + Math.random()*1800, 0.12*v, 0.09, 'sine'); tone(7600 + Math.random()*900, 0.05*v, 0.05, 'sine'); },
+  thud(){ burst({ freq:300, q:1, vol:0.5, dur:0.08, curve:4, type:'lowpass' }); },
+  fold(){ burst({ freq:1500, q:2, vol:0.45, dur:0.04 }); tone(800, 0.15, 0.05, 'square', 0.03); },
+};
+
+// ---------- rifle state ----------
+const SEL = ['안전', '단발', '점사', '연발'];
+const S = {
+  selector:0, chambered:false, cocked:false, hammer:0,
+  mag:{ count:30 }, attached:true, magOut:0, newMag:false,
+  carrier:0, carrierV:0, dragging:false, extracted:false, charging:null,
+  trigger:false, burst:0, cooldown:0, streak:0,
+  kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
+  bayonet:false, bay:0, disasm:false, ex:0, gas:1, spent:false,
+  hits:0, points:0, rangeShots:0,
+};
+let msg = '', msgT = 0;
+function say(t){ msg = t; msgT = 2.2; renderHud(); }
+const canFeed = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count > 0;
+// strip the top round: it follows the bolt forward into the chamber while the column rises one step
+function feedFromMag(){
+  const z = S.mag.count % 2 === 0 ? 0.05 : -0.05;              // side of the round on top right now
+  S.mag.count--; layoutMag(S.mag.count);
+  parts.stack.position.y = -parts.MSTEP;
+  S.feed = { from:new THREE.Vector3(parts.MTOP.x - 0.38, parts.MTOP.y, z).add(parts.mag.position) };
+  S.chambered = true;
+}
+
+const casings = [];
+function eject(live){
+  const r = makeRound(live); shadowed(r);
+  r.position.copy(rec.localToWorld(new THREE.Vector3(0.45, 0.45, 0.38)));
+  rec.getWorldQuaternion(r.quaternion); r.rotateZ(-Math.PI/2);
+  const q = new THREE.Quaternion(); rec.getWorldQuaternion(q);
+  const v = new THREE.Vector3(-1.2 + Math.random()*0.8, 3 + Math.random()*1.5, 5.5 + Math.random()*1.5).applyQuaternion(q);
+  scene.add(r);
+  casings.push({ obj:r, v, w:new THREE.Vector3(Math.random()*20-10, Math.random()*30-15, Math.random()*20-10), life:7, bounces:0 });
+  if (casings.length > 60){ const c = casings.shift(); scene.remove(c.obj); }
+}
+function floorY(){ return view === 'range' ? RANGE_GROUND + 0.05 : ground.position.y + 0.05; }
+function updateCasings(dt){
+  const fy = floorY();
+  for (let i=casings.length-1;i>=0;i--){
+    const c = casings[i], o = c.obj;
+    c.v.y -= 30*dt; o.position.addScaledVector(c.v, dt);
+    o.rotation.x += c.w.x*dt; o.rotation.y += c.w.y*dt; o.rotation.z += c.w.z*dt;
+    if (o.position.y < fy){
+      o.position.y = fy;
+      const sp = Math.abs(c.v.y);
+      if (sp > 1.5 && c.bounces < 4){ SND.clink(Math.min(1, sp/8)); c.bounces++; }
+      c.v.y = -c.v.y*0.35; c.v.x *= 0.6; c.v.z *= 0.6; c.w.multiplyScalar(0.5);
+      if (Math.abs(c.v.y) < 0.5){ c.v.y = 0; c.w.multiplyScalar(0.8); }
+    }
+    c.life -= dt;
+    if (c.life <= 0){ scene.remove(c.obj); casings.splice(i, 1); }
+  }
+}
+
+// hammer falls: fires the chambered round, then the action cycles, re-cocks and feeds
+function fire(){
+  if (!S.cocked) return false;
+  S.cocked = false; S.hammer = 0;
+  if (!S.chambered){ SND.click(); S.burst = 0; say('딸깍 — 약실이 비었어요'); return false; }
+  S.chambered = false;
+  SND.shot(); S.flash = 0.05;
+  const hot = S.gas === 2;
+  S.kickV += hot ? 8 : 7; S.riseV += (S.fold > 0.5 ? 5 : 3.2) * (hot ? 1.15 : 1);
+  if (S.gas === 0){
+    // gas shut off: nothing drives the carrier, the empty case stays in the chamber
+    S.spent = true; S.burst = 0;
+    say('가스 차단 — 노리쇠를 손으로 당겨야 해요 (F)');
+  } else {
+    S.carrier = TRAVEL; S.carrierV = 0; S.cocked = true;
+    eject(false);
+    if (canFeed()) feedFromMag();
+  }
+  S.cooldown = S.clear ? 0.5 : hot ? 0.062 : 0.075; S.streak++;
+  if (view === 'range') shootTarget();
+  if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) try { navigator.vibrate(25); } catch(e){}
+  renderHud();
+  return true;
+}
+function pullTrigger(){
+  if (S.trigger) return; S.trigger = true;
+  if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사격 (D)'); return; }
+  if (S.selector === 0){ SND.safe(); say('안전 상태 — 조정간을 돌리세요 (Q)'); return; }
+  if (!S.cocked){ say('공이치기가 풀려 있어요 — 노리쇠를 당기세요 (F)'); return; }
+  if (S.cooldown > 0) return;
+  S.streak = 0;
+  if (fire() && S.selector === 2) S.burst = 2;
+}
+function releaseTrigger(){ S.trigger = false; }
+const GAS = ['O 차단', 'Ⅰ 정상', 'Ⅱ 악조건'];
+function cycleGas(){
+  S.gas = (S.gas + 1) % 3;
+  burst({ freq:2200, q:3, vol:0.4, dur:0.03 }); tone(900, 0.12, 0.04, 'square', 0.03);
+  say(`가스조절기 ${GAS[S.gas]}` + (S.gas === 0 ? ' — 자동 장전이 안 돼요' : S.gas === 2 ? ' — 가스 많이, 더 빠르고 세게' : ''));
+}
+function cycleSelector(){ S.selector = (S.selector + 1) % 4; SND.safe(); renderHud(); }
+function setSelector(i){ S.selector = i; SND.safe(); renderHud(); }
+
+// charging handle: fully back extracts (and cocks); letting go strips the next round into the chamber
+function chargeExtract(){
+  if (S.extracted) return; S.extracted = true; S.cocked = true;
+  if (S.chambered){ S.chambered = false; eject(true); }
+  else if (S.spent){ eject(false); }
+  S.spent = false;
+  SND.bolt(0.45);
+}
+function chargeRelease(){
+  if (S.extracted && canFeed()) feedFromMag();
+  S.extracted = false; S.dragging = false;
+  setTimeout(()=>SND.bolt(0.7), 60);
+  renderHud();
+}
+function chargeAuto(){ if (S.disasm || S.ex > 0.05){ say('분해 상태예요 — 조립 후 사용 (D)'); return; } if (!S.charging && !S.dragging) S.charging = { t:0 }; }
+
+// magazine: detach (it stays beside the rifle with its rounds) / attach / swap for a full one
+function toggleMag(){
+  if (S.attached){ S.attached = false; SND.magOut(); }
+  else { S.attached = true; setTimeout(SND.magIn, 120); }
+  renderHud();
+}
+function newMag(){
+  if (S.newMag) return; S.newMag = true;
+  const old = S.mag, wasIn = S.attached;
+  if (old){
+    // the old magazine drops away
+    const drop = parts.mag.clone(true); rec.add(drop); drop.position.copy(parts.mag.position); scene.attach(drop);
+    const q = new THREE.Quaternion(); rec.getWorldQuaternion(q);
+    casings.push({ obj:drop, v:new THREE.Vector3(0.3, -2, 0).applyQuaternion(q), w:new THREE.Vector3(0, 0, -1.2), life:3, bounces:3 });
+    if (wasIn) SND.magOut();
+  }
+  S.mag = { count:30 }; layoutMag(30); S.feed = null; parts.stack.position.y = 0;
+  S.attached = false; S.magOut = 3.2;
+  setTimeout(()=>{ S.attached = true; S.newMag = false; setTimeout(SND.magIn, 150); renderHud(); }, 250);
+  renderHud();
+}
+function toggleStock(){ S.folded = !S.folded; SND.fold(); renderHud(); }
+function toggleClear(){ S.clear = !S.clear; setClear(S.clear); renderHud(); }
+function toggleBayonet(){
+  S.bayonet = !S.bayonet;
+  burst({ freq:5200, q:0.8, vol:0.35, dur:0.12, curve:2, type:'highpass', sweep:2500 });
+  setTimeout(()=>{ burst({ freq:2600, q:3, vol:0.6, dur:0.03 }); tone(1500, 0.2, 0.05, 'square'); }, 140);
+  renderHud();
+}
+// field strip: the bolt carrier group comes apart and floats above the rifle with names
+function toggleDisasm(){
+  if (view !== 'inspect') setView('inspect');
+  S.disasm = !S.disasm; S.charging = null; S.trigger = false; S.burst = 0;
+  burst({ freq:1600, q:2, vol:0.45, dur:0.05 }); tone(700, 0.15, 0.06, 'square', 0.04);
+  renderHud();
+}
+
+// ---------- shooting at the target ----------
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function shootTarget(){
+  S.rangeShots++;
+  aim.updateMatrixWorld(true);
+  camera.getWorldPosition(tmpA);
+  const dir = tmpB.set(1, 0, 0).applyQuaternion(aim.getWorldQuaternion(new THREE.Quaternion()));
+  const spread = 0.0012 + Math.min(0.012, S.streak*0.0018);
+  dir.add(new THREE.Vector3(0, (Math.random()-0.5)*2*spread, (Math.random()-0.5)*2*spread)).normalize();
+  aimKick += 0.01 + (S.fold > 0.5 ? 0.006 : 0);
+  if (Math.abs(dir.x) < 1e-4) return;
+  const t = (TARGET_X - tmpA.x) / dir.x; if (t <= 0) return;
+  const lp = target.worldToLocal(tmpA.clone().addScaledVector(dir, t));
+  if (Math.abs(lp.x) > TSIZE/2 || Math.abs(lp.y) > TSIZE/2){ popScore('빗나감'); return; }
+  const u = (lp.x/TSIZE + 0.5)*512, v = (0.5 - lp.y/TSIZE)*512;
+  const g = targetCanvas.getContext('2d');
+  g.beginPath(); g.arc(u, v, 4, 0, Math.PI*2); g.fillStyle = '#4b2d12'; g.fill();
+  g.beginPath(); g.arc(u, v, 6, 0, Math.PI*2); g.strokeStyle = 'rgba(200,170,120,.8)'; g.lineWidth = 1.5; g.stroke();
+  targetTex.needsUpdate = true;
+  const pts = Math.max(0, 10 - Math.floor(Math.hypot(u - 256, v - 256)/24));
+  S.hits++; S.points += pts; popScore(pts ? `${pts}점` : '0점');
+}
+const popEl = document.getElementById('pop');
+function popScore(t){ popEl.textContent = t; popEl.classList.remove('go'); void popEl.offsetWidth; popEl.classList.add('go'); renderHud(); }
+
+// ---------- views ----------
+let view = 'inspect', aimYaw = 0, aimPitch = 0, aimYawT = 0, aimPitchT = 0, aimKick = 0;
+const aspect = () => (camera.aspect > 0 && isFinite(camera.aspect)) ? camera.aspect : 1.6;
+function inspectCamera(){
+  // fit the whole rifle (≈ 11.5 units long) whatever the screen shape
+  const tv = Math.tan(THREE.MathUtils.degToRad(17.5));
+  const d = Math.max(7.4/(tv*aspect()), 4.8/tv);
+  camera.position.copy(new THREE.Vector3(0.15, 0.25, 1).normalize().multiplyScalar(d));
+  controls.target.set(0, -0.2, 0); controls.update();
+}
+function setView(v){
+  view = v;
+  const isRange = v === 'range';
+  if (isRange) S.disasm = false;
+  document.body.classList.toggle('range', isRange);
+  range.visible = isRange; ground.visible = !isRange;
+  scene.fog = isRange ? new THREE.Fog(0xdcecf8, 150, 700) : null;
+  parts.rearSight.visible = !isRange;
+  parts.flashSide.forEach(m=>m.visible = !isRange);
+  if (isRange){
+    aim.add(gun); gun.position.set(1.85, -SIGHT_Y, 0);
+    aim.add(camera); camera.position.set(0, 0, 0); camera.rotation.set(0, -Math.PI/2, 0);
+    camera.fov = 16; controls.enabled = false;
+    aimYaw = aimPitch = aimYawT = aimPitchT = aimKick = 0;
+    key.position.set(-20, 60, 30); key.target.position.set(40, 0, 0);
+  } else {
+    holder.add(gun); gun.position.set(GUN_X, 0, 0);
+    scene.add(camera); camera.fov = 35; controls.enabled = true;
+    key.position.set(6, 20, 14); key.target.position.set(0, 0, 0);
+    camera.updateProjectionMatrix(); inspectCamera();
+  }
+  camera.updateProjectionMatrix();
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on', b.dataset.v === v));
+  document.getElementById('score').hidden = !isRange;
+  setHint(); renderHud();
+}
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+if (TOUCH) document.body.classList.add('touch');
+function setHint(){
+  const h = document.getElementById('hint');
+  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · R 탄창 · B 대검 · Tab 점검';
+  else if (TOUCH) h.textContent = '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 탄창/대검/개머리판도 눌러보세요';
+  else h.textContent = TOUCH ? '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 조정간/탄창/개머리판도 눌러보세요'
+                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
+}
+
+// ---------- HUD ----------
+const ammoEl = document.getElementById('ammo'), ammoLbl = document.getElementById('ammoLbl'), statusEl = document.getElementById('status'),
+      selEl = document.getElementById('sel'), scoreEl = document.getElementById('score');
+function renderHud(){
+  ammoEl.firstChild.nodeValue = S.mag && S.attached ? S.mag.count : '–';
+  ammoEl.lastChild.textContent = ` + ${S.chambered ? 1 : 0}`;
+  const side = S.mag && S.mag.count > 0 ? ` · ${S.mag.count % 2 === 0 ? '우' : '좌'}상탄` : '';
+  ammoLbl.textContent = (S.mag && !S.attached ? `탄창 분리됨 (${S.mag.count}발) + 약실` : '탄창 + 약실') + side;
+  [...selEl.children].forEach((s, i)=>{ s.classList.toggle('on', i === S.selector); s.classList.toggle('safe', i === 0); });
+  let t, cls = 'warn';
+  if (msgT > 0) t = msg;
+  else if (S.disasm) t = '분해 상태 — 노리쇠뭉치를 둘러보세요 (D 조립)';
+  else if (!S.chambered && !(S.mag && S.attached)) t = '탄창이 분리돼 있어요 — 탄창 결합 (R)';
+  else if (S.spent) t = '약실에 빈 탄피 — 노리쇠를 당기세요 (F)';
+  else if (!S.chambered && S.mag.count > 0) t = '약실이 비었어요 — 노리쇠를 당기세요 (F)';
+  else if (!S.chambered) t = '탄이 떨어졌어요 — 새 탄창 (N)';
+  else if (S.selector === 0) t = '장전 완료 · 안전 — 조정간을 돌리세요 (Q)';
+  else { t = `사격 준비 완료 · ${SEL[S.selector]}`; cls = 'ok'; }
+  statusEl.textContent = t; statusEl.className = cls;
+  scoreEl.textContent = `명중 ${S.hits} / ${S.rangeShots}발 · ${S.points}점`;
+  document.querySelector('#bMag b').textContent = S.attached ? '탄창 분리' : '탄창 결합';
+  document.getElementById('bMag').classList.toggle('on', !S.attached);
+  document.getElementById('bStock').classList.toggle('on', S.folded);
+  document.getElementById('bClear').classList.toggle('on', S.clear);
+  document.getElementById('gasChip').textContent = `가스 ${GAS[S.gas]}`;
+  document.getElementById('bBay').classList.toggle('on', S.bayonet);
+  document.querySelector('#bDis b').textContent = S.disasm ? '조립' : '분해';
+  document.getElementById('bDis').classList.toggle('on', S.disasm);
+}
+
+// ---------- input ----------
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function aimRay(e){ ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1); ray.setFromCamera(ndc, camera); }
+let active = null, dragPlane = new THREE.Plane(), dragX0 = 0, dragC0 = 0, touchAim = null;
+const cvs = renderer.domElement;
+// in clear mode clicks should hit the parts you can see, not the glassy shell in front of them
+function pickGun(){
+  const hits = ray.intersectObject(gun, true).filter(h=>h.object.visible && h.object.material && h.object.material.opacity > 0);
+  return hits.find(h=>h.object.userData.part !== 'body') || hits[0];
+}
+cvs.addEventListener('pointerdown', e=>{
+  ac();
+  if (view === 'range'){
+    cvs.setPointerCapture(e.pointerId);
+    if (e.pointerType === 'mouse'){ active = 'trigger'; pullTrigger(); }
+    else touchAim = { x:e.clientX, y:e.clientY, yaw:aimYawT, pitch:aimPitchT };
+    return;
+  }
+  aimRay(e);
+  const hit = pickGun();
+  if (!hit) return;
+  controls.enabled = false; cvs.setPointerCapture(e.pointerId);
+  const part = hit.object.userData.part;
+  if (part === 'handle' && !S.disasm){
+    active = 'handle'; S.dragging = true; S.extracted = false;
+    dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), hit.point);
+    dragX0 = rec.worldToLocal(hit.point.clone()).x; dragC0 = S.carrier;
+  } else if (part === 'selector'){ active = 'ui'; cycleSelector(); }
+  else if (part === 'mag'){ active = 'ui'; toggleMag(); }
+  else if (part === 'stock'){ active = 'ui'; toggleStock(); }
+  else if (part === 'bayonet'){ active = 'ui'; toggleBayonet(); }
+  else if (part === 'gas'){ active = 'ui'; cycleGas(); }
+  else { active = 'trigger'; pullTrigger(); }
+});
+cvs.addEventListener('pointermove', e=>{
+  if (view === 'range'){
+    if (e.pointerType === 'mouse'){
+      aimYawT = -(e.clientX/innerWidth*2-1) * 0.28; aimPitchT = -(e.clientY/innerHeight*2-1) * 0.16;
+    } else if (touchAim){
+      aimYawT = THREE.MathUtils.clamp(touchAim.yaw - (e.clientX - touchAim.x)/innerWidth * 0.5, -0.35, 0.35);
+      aimPitchT = THREE.MathUtils.clamp(touchAim.pitch - (e.clientY - touchAim.y)/innerHeight * 0.35, -0.2, 0.2);
+    }
+    return;
+  }
+  if (active === 'handle'){
+    aimRay(e);
+    if (ray.ray.intersectPlane(dragPlane, tmpA)){
+      const x = rec.worldToLocal(tmpA.clone()).x;
+      S.carrier = THREE.MathUtils.clamp(dragC0 - (x - dragX0), 0, TRAVEL);
+      if (S.carrier > TRAVEL*0.92) chargeExtract();
+    }
+    return;
+  }
+  if (!active){
+    aimRay(e);
+    const hit = pickGun(), p = hit && hit.object.userData.part;
+    cvs.style.cursor = !hit ? 'grab' : p === 'handle' ? 'ew-resize' : 'pointer';
+  }
+});
+function endPointer(){
+  if (active === 'trigger') releaseTrigger();
+  if (active === 'handle') chargeRelease();
+  active = null; touchAim = null;
+  if (view === 'inspect') controls.enabled = true;
+}
+cvs.addEventListener('pointerup', endPointer);
+cvs.addEventListener('pointercancel', endPointer);
+
+const fireBtn = document.getElementById('fire');
+fireBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); ac(); fireBtn.setPointerCapture(e.pointerId); pullTrigger(); });
+fireBtn.addEventListener('pointerup', releaseTrigger);
+fireBtn.addEventListener('pointercancel', releaseTrigger);
+document.getElementById('bCharge').onclick = ()=>{ ac(); chargeAuto(); };
+document.getElementById('bMag').onclick = ()=>{ ac(); toggleMag(); };
+document.getElementById('bNew').onclick = ()=>{ ac(); newMag(); };
+document.getElementById('bStock').onclick = ()=>{ ac(); toggleStock(); };
+document.getElementById('bClear').onclick = toggleClear;
+document.getElementById('gasChip').onclick = ()=>{ ac(); cycleGas(); };
+document.getElementById('bBay').onclick = ()=>{ ac(); toggleBayonet(); };
+document.getElementById('bDis').onclick = ()=>{ ac(); toggleDisasm(); };
+document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick = ()=>setView(b.dataset.v));
+[...selEl.children].forEach((s, i)=>s.onclick = ()=>{ ac(); setSelector(i); });
+
+addEventListener('keydown', e=>{
+  if (e.repeat){ if (e.code === 'Space') e.preventDefault(); return; }
+  ac();
+  switch (e.code){
+    case 'Space': e.preventDefault(); pullTrigger(); break;
+    case 'KeyQ': cycleSelector(); break;
+    case 'KeyF': chargeAuto(); break;
+    case 'KeyR': toggleMag(); break;
+    case 'KeyN': newMag(); break;
+    case 'KeyV': toggleStock(); break;
+    case 'KeyX': toggleClear(); break;
+    case 'KeyB': toggleBayonet(); break;
+    case 'KeyG': cycleGas(); break;
+    case 'KeyD': toggleDisasm(); break;
+    case 'Tab': e.preventDefault(); setView(view === 'range' ? 'inspect' : 'range'); break;
+  }
+});
+addEventListener('keyup', e=>{ if (e.code === 'Space'){ e.preventDefault(); releaseTrigger(); } });
+addEventListener('contextmenu', e=>e.preventDefault());
+['gesturestart', 'gesturechange'].forEach(t=>document.addEventListener(t, e=>e.preventDefault()));
+document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
+const PORT0 = 0.025, PORT1 = 0.875;     // ejection port span (x)
+const tmpFeedEnd = new THREE.Vector3(1.28, BORE, 0);
+let hudT = 0;
+function animate(){
+  const dt = Math.min(clock.getDelta(), 1/30), t = clock.elapsedTime;
+
+  // burst / automatic fire
+  S.cooldown -= dt;
+  if (S.cooldown <= 0){
+    if (S.burst > 0){ S.burst--; fire(); }
+    else if (S.selector === 3 && S.trigger && S.chambered && S.cocked) fire();
+  }
+  // manual charge (F / button)
+  if (S.charging){
+    S.charging.t += dt;
+    S.carrier = Math.min(TRAVEL, S.charging.t/0.16*TRAVEL);
+    if (S.carrier >= TRAVEL){ chargeExtract(); if (S.charging.t > 0.26){ S.charging = null; chargeRelease(); } }
+  } else if (!S.dragging){
+    const k = S.clear ? 140 : 1600;   // slow motion in clear view
+    for (let i=0;i<4;i++) [S.carrier, S.carrierV] = spring(S.carrier, S.carrierV, 0, k, 2*Math.sqrt(k)*1.05, dt/4);
+    if (S.carrier < 0) S.carrier = 0;
+  }
+  if (S.carrier > 0.3) S.cocked = true;
+  if (S.ex > 0.05) S.carrier = 0;
+  parts.carrier.position.x = -S.carrier;
+  // recoil springs compress as the carrier comes back (spring runs from x=-1.12 to the carrier's rear face)
+  parts.springs.forEach(s=>s.scale.y = Math.max(0.05, (0.15 - S.carrier) + 1.12));
+  // bolt strip in the port (opaque mode)
+  const b0 = 0.0 - S.carrier + 0.17, b1 = 1.26 - S.carrier, lo = Math.max(b0, PORT0), hi = Math.min(b1, PORT1);
+  parts.bolt.visible = !S.clear && hi > lo && S.ex < 0.05; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
+  // feeding round: sits at the magazine lips until the bolt face reaches it, then rides up the feed ramp nose-first
+  if (S.feed){
+    const fr = parts.feedRound, pf = THREE.MathUtils.clamp((0.78 - S.carrier/TRAVEL)/0.78, 0, 1), e = pf*pf*(3 - 2*pf);
+    fr.visible = pf < 1;
+    fr.position.lerpVectors(S.feed.from, tmpFeedEnd, e); fr.position.y += Math.sin(e*Math.PI)*0.1;
+    fr.rotation.z = -Math.PI/2 + Math.sin(e*Math.PI)*0.28;
+    if (pf > 0.25) parts.stack.position.y += (0 - parts.stack.position.y) * Math.min(1, dt*14);
+    if (pf >= 1 && S.carrier < 0.02) S.feed = null;
+  } else { parts.feedRound.visible = false; parts.stack.position.y += (0 - parts.stack.position.y) * Math.min(1, dt*14); }
+  parts.chamberRound.visible = (S.chambered || S.spent) && S.carrier < 0.1 && !S.feed;
+  parts.chamberRound.children[1].visible = S.chambered;   // the bullet is gone from a fired case
+  // hammer: leans back when cocked, snaps forward when it falls
+  S.hammer += ((S.cocked ? 1 : 0) - S.hammer) * Math.min(1, dt*(S.cocked ? 14 : 40));
+  parts.hammer.rotation.z = 0.15 + S.hammer*0.95;
+
+  parts.trigger.rotation.z += ((S.trigger ? -0.3 : 0) - parts.trigger.rotation.z) * Math.min(1, dt*30);
+  const sa = parts.SEL_ANG[S.selector]; parts.selector.rotation.z += (sa - parts.selector.rotation.z) * Math.min(1, dt*20);
+  const ga = parts.GAS_ANG[S.gas]; parts.gas.rotation.x += (ga - parts.gas.rotation.x) * Math.min(1, dt*16);
+  for (let i=0;i<4;i++) [S.fold, S.foldV] = spring(S.fold, S.foldV, S.folded ? 1 : 0, 120, 14, dt/4);
+  parts.stock.rotation.y = S.fold * Math.PI;
+  // bayonet: on the lug, or parked below the barrel when off (hidden on the range)
+  S.bay += ((S.bayonet ? 1 : 0) - S.bay) * Math.min(1, dt*10);
+  parts.bayonet.visible = S.bay > 0.02;
+  const off = 1 - S.bay;
+  parts.bayonet.position.set(off*2.2, 0, 0);
+
+  // disassembly: lift every bolt-group piece out to its own spot
+  S.ex += ((S.disasm ? 1 : 0) - S.ex) * Math.min(1, dt*6);
+  const ease = S.ex*S.ex*(3 - 2*S.ex);
+  parts.explode.forEach((p, i)=>{
+    p.g.position.copy(p.base).addScaledVector(p.off, ease);
+    if (S.disasm) p.g.position.y += Math.sin(t*1.5 + i)*0.03*ease;
+    p.label.material.opacity = ease > 0.6 ? (ease - 0.6)/0.4 : 0;
+  });
+  parts.upper.rotation.z = -0.33*ease;   // rear lifts, barrel tips down
+  controls.target.y += ((S.disasm ? 1.0 : -0.2) - controls.target.y) * Math.min(1, dt*4);
+
+  // magazine: seated, or parked below the rifle when detached (out of sight on the range)
+  const magTarget = S.attached ? 0 : (view === 'range' ? 6 : 2.4);
+  S.magOut += (magTarget - S.magOut) * Math.min(1, dt*12);
+  parts.mag.visible = !!S.mag;
+  parts.mag.position.copy(MAG_DIR).multiplyScalar(S.magOut);
+  if (!S.attached && view === 'inspect') parts.mag.position.y += Math.sin(t*1.6)*0.05;
+
+  // recoil + muzzle flash
+  for (let i=0;i<4;i++){ [S.kick, S.kickV] = spring(S.kick, S.kickV, 0, 900, 30, dt/4); [S.rise, S.riseV] = spring(S.rise, S.riseV, 0, 500, 24, dt/4); }
+  rec.position.x = -S.kick*0.06; rec.rotation.z = S.rise*0.02;
+  S.flash -= dt;
+  const on = S.flash > 0;
+  M.flash.opacity = on ? (view === 'range' ? 0.45 : 0.9) : 0; parts.flashLight.intensity = on ? 4 : 0;
+  if (on){ parts.flash.rotation.x = Math.random()*Math.PI; parts.flash.scale.setScalar(0.8 + Math.random()*0.5); }
+
+  if (view === 'inspect'){
+    holder.position.y = Math.sin(t*1.1)*0.1;
+    holder.rotation.y = Math.sin(t*0.4)*0.04;
+  } else {
+    aimKick *= Math.pow(0.02, dt);
+    aimYaw += (aimYawT - aimYaw) * Math.min(1, dt*10);
+    aimPitch += (aimPitchT - aimPitch) * Math.min(1, dt*10);
+    aim.rotation.set(0, aimYaw + Math.sin(t*0.9)*0.002, aimPitch + aimKick + Math.sin(t*1.3)*0.0025);
+  }
+  updateCasings(dt);
+  if (msgT > 0) msgT -= dt;
+  if ((hudT += dt) > 0.2){ hudT = 0; renderHud(); }
+  if (view === 'inspect') controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+layoutMag(30);
+setView('inspect');
+animate();
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight || 1.6; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  if (view === 'inspect') inspectCamera();
+});
+</script>
+</body>
+</html>

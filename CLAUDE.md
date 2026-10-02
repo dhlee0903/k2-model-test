@@ -1,0 +1,32 @@
+# CLAUDE.md — K2 소총 시뮬레이터
+
+다른 기기(폰·집 PC·claude.ai/code)에서 이어서 작업할 때 먼저 읽을 것.
+
+## 구조
+
+- 단일 파일 `index.html`: CSS → HUD/도크 HTML → three.js r128 스크립트. 빌드 없음.
+- 좌표계: 총구 +x, 위 +y, 총의 오른쪽 +z. 1 unit ≈ 85 mm. 총강(bore) 축 y = 0.38, 가늠선 `SIGHT_Y`.
+- 주요 블록
+  - `buildRifle()` — 외형(윗/아랫몸통, 개머리판, 총열덮개, 가늠쇠, 조정간, 가스조절기), 내부(노리쇠뭉치·노리쇠·공이·캠핀·공이고정핀·가스피스톤·복좌용수철·공이치기), 탄창(탄알/받침판/스프링), 대검.
+  - 끝부분에서 윗몸통 부품들을 `parts.upper`로 묶어 분해 시 앞 분해핀(1.12, 0.02)을 축으로 연다.
+  - `fire()` / `pullTrigger()` / `chargeExtract()` / `chargeRelease()` / `feedFromMag()` — 작동 로직(약실·공이치기·급탄·가스 설정).
+  - `animate()` — 노리쇠 이동, 급탄 애니메이션, 분해/대검/탄창 보간, 반동.
+- 재질: `SHELL` 목록의 재질이 투명 보기에서 반투명이 된다. 금속/폴리머 질감은 캔버스로 만든 노이즈·체크 텍스처.
+
+## 확인 방법
+
+- `python -m http.server 8765`로 띄워서 본다.
+- 창이 백그라운드면 requestAnimationFrame이 멈춰서 스크린샷이 안 찍힐 수 있다. 그럴 땐 `tools/snap_server.py`를 띄워 페이지에서 `renderer.domElement.toDataURL()`을 POST로 저장해 확인했다.
+- 작동 테스트는 콘솔에서 `chargeAuto()`, `setSelector(n)`, `pullTrigger()/releaseTrigger()`, `toggleMag()`, `toggleDisasm()` 등을 호출하고 `S`(상태)를 확인.
+
+## 남은 문제 (사용자 피드백, 미해결)
+
+1. **노리쇠뭉치 위치 버그**: 분해용 `parts.upper`로 옮길 때 `upper.attach()`를 써서 자식들의 로컬 좌표가 바뀌었는데, `animate()`는 여전히 rifle 좌표(`parts.carrier.position.x = -S.carrier`, 복좌용수철 piece의 `base` 등)로 덮어쓴다 → 노리쇠뭉치가 총열덮개 쪽으로 밀려 보임. 해결안: `upper` 안에 `-pivot` 오프셋 그룹을 두고 `inner.add(ch)`로 rifle 좌표를 유지.
+2. **급탄이 "마법처럼" 보임**: 노리쇠가 순간이동(`S.carrier = TRAVEL`)함. 노리쇠가 실제로 뒤로 갔다 오는 사이클 애니메이션, 노리쇠 면이 탄 뒤를 밀어 약실로 넣기, 받침판(follower)+스프링이 탄을 밀어올리는 동작이 보여야 함(스프링이 follower에 붙어 늘어나야 함).
+3. **공이/공이치기 위치**: 공이치기가 공이 뒤끝을 칠 수 있는 위치여야 함. 방아쇠 핀이 공이치기 핀보다 앞.
+4. **개머리판 모양·전체 좌표가 사진과 다름**: 참고 사진(K2 오른쪽 옆모습, 1000×301px)에서 실루엣을 다시 재서 맞출 것. 환산: `x = (px - 300)/79 - 1.25`, `y = (93 - py)/79 + 0.38`. 측정값 예: 개머리판 끝 x≈60px(위 76~아래 181), 손목 x≈240px(87~132), 몸통 뒤 x≈300(62~133), 가늠자 드럼 꼭대기 y≈37, 총열덮개 x 510~650(62~119), 가스관 y 68~80 / 총열 y 89~104, 가늠쇠 x≈790(꼭대기 y≈31), 소염기 x 910~960.
+5. K2 작동원리·분해도 자료 조사 결과를 반영 (장행정 가스피스톤, 회전노리쇠, 복좌용수철 위치 등).
+
+## 배포
+
+`npx vercel deploy --prod` (Vercel 프로젝트 `k2-simulator`, 주소 https://k2-simulator.vercel.app).
