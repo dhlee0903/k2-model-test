@@ -307,7 +307,7 @@ function makeRound(live){
 
 // ---------- rifle: dimensions taken from a side photo of the K2 ----------
 // muzzle +x, up +y, right side +z; 1 unit ≈ 85 mm, bore line y = 0.38
-const SIGHT_Y = 1.02, TRAVEL = 1.0, BORE = 0.38;
+const SIGHT_Y = 0.97, TRAVEL = 1.0, BORE = 0.38;
 const gun = new THREE.Group(), rec = new THREE.Group(); gun.add(rec);
 const parts = { portCover:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
@@ -405,13 +405,13 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // (reference renders) the aperture rides on a windage screw running wall to wall: a low base block on the channel
   // floor, the threaded screw through it, and a slider carrying the leaves' pivot, with a white scale on its back
   at(rs, rbox(0.2, 0.045, 0.2, 0.01, M.gunDark), -0.8, 0.795, 0);                         // base on the channel floor
-  at(rs, cylZ(0.02, 0.5, M.dsteel, 14), -0.8, 0.85, 0);                                   // windage screw, wall to wall
-  for (let k=-9;k<=9;k++) if (Math.abs(k) > 2){ const t = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0035, 5, 14), M.steel); at(rs, t, -0.8, 0.85, k*0.024); }   // its threads
-  at(rs, rbox(0.1, 0.13, 0.11, 0.012, M.gunDark), -0.8, 0.885, 0);                        // slider up to the leaves' pivot
-  at(rs, rbox(0.03, 0.03, 0.13, 0.008, M.gunDark), -0.8, 0.94, 0);                        // pivot boss
+  at(rs, cylZ(0.02, 0.5, M.dsteel, 14), -0.8, 0.835, 0);                                   // windage screw, wall to wall
+  for (let k=-9;k<=9;k++) if (Math.abs(k) > 2){ const t = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0035, 5, 14), M.steel); at(rs, t, -0.8, 0.835, k*0.024); }   // its threads
+  at(rs, rbox(0.1, 0.075, 0.11, 0.012, M.gunDark), -0.8, 0.84, 0);                         // slider, just tall enough to carry the pivot
+  at(rs, rbox(0.04, 0.03, 0.13, 0.008, M.gunDark), -0.8, 0.868, 0);                       // pivot knuckles
   { const sc = engraved(g=>{ g.fillRect(8, 30, 112, 3); for (let i=0;i<=8;i++){ const x = 8 + i*14; g.fillRect(x - 1, i % 4 ? 18 : 8, 3, i % 4 ? 12 : 22); } g.fillRect(60, 36, 8, 14); },
       128, 56, 0.1, 0.044, false, 'rgba(236,236,230,.95)');
-    sc.rotation.y = -Math.PI/2; sc.position.set(-0.8505, 0.875, 0); rs.add(sc); }                // windage scale on the slider's back
+    sc.rotation.y = -Math.PI/2; sc.position.set(-0.8505, 0.83, 0); rs.add(sc); }                // windage scale on the slider's back
   // windage drum, right side (photo): set in a counterbore, worn steel face with four spanner holes, a small index
   // hole below the centre and a stud with a lock nut in the middle; "R —" stamped below it
   const drumM = new THREE.MeshStandardMaterial({ color:0x5f5a4e, map:parkMap, roughness:0.42, metalness:0.82, envMapIntensity:1.0 });
@@ -430,12 +430,16 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     mk.position.set(DX - 0.02, DY - 0.175, 0.2812); rs.add(mk); }
   // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
   // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
-  const flip = new THREE.Group(); flip.position.set(-0.8, 0.965, 0); rs.add(flip); parts.flip = flip;
+  const flip = new THREE.Group(); flip.position.set(-0.8, 0.875, 0); rs.add(flip); parts.flip = flip;
   // each leaf (photo ①): square below, a round dome on top, and a big round peep hole in the middle of the dome
-  const leaf = hole=>{ const R = 0.082, hc = SIGHT_Y - 0.965, sh = new THREE.Shape();
+  const leaf = hole=>{ const R = 0.074, hc = SIGHT_Y - 0.875, sh = new THREE.Shape();
     sh.moveTo(-R, 0); sh.lineTo(R, 0); sh.lineTo(R, hc); sh.absarc(0, hc, R, 0, Math.PI, false); sh.lineTo(-R, 0);
     const ho = new THREE.Path(); ho.absarc(0, hc, hole, 0, Math.PI*2, true); sh.holes.push(ho);
-    const m = extrude(sh, 0.024, M.gunDark, 0.006); m.rotation.y = Math.PI/2; m.position.x = -0.012; return m; };
+    const m = extrude(sh, 0.022, M.gunDark, 0.005); m.rotation.y = Math.PI/2; m.position.x = -0.011;
+    const g = new THREE.Group(); g.add(m);
+    // (reference) a raised ring round the peep on the eye side, and a thinner neck below the dome
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(hole + 0.012, 0.009, 8, 28), M.gunDark); ring.rotation.y = Math.PI/2; at(g, shadowed(ring), -0.018, hc, 0);
+    return g; };
   flip.add(leaf(0.038));                                                                // aperture standing (normal)
   const leafB = leaf(0.055); const leafBG = new THREE.Group(); leafBG.rotation.z = Math.PI/2; leafBG.add(leafB); flip.add(leafBG);   // larger aperture, lying back
   at(flip, cylZ(0.016, 0.47, M.steel, 12), 0, 0, 0);                                  // cross pin, wall to wall
@@ -692,15 +696,15 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // on its face pointing down at the regulator. The post is a blade standing in a notch at the bottom of the ring.
   const FX = 5.085;                                                                      // ring / post centre (x)
   const key = new THREE.Shape();
-  key.moveTo(-0.105, 0.6); key.lineTo(-0.105, 0.76); key.quadraticCurveTo(-0.105, 0.86, -0.135, 0.917);
-  key.absarc(0, 1.03, 0.176, Math.PI + 0.7, -0.7, true);
-  key.quadraticCurveTo(0.105, 0.86, 0.105, 0.76); key.lineTo(0.105, 0.6); key.closePath();
-  const keyHole = new THREE.Path(); keyHole.absarc(0, 1.03, 0.128, 0, Math.PI*2, false); key.holes.push(keyHole);
+  key.moveTo(-0.105, 0.6); key.lineTo(-0.105, 0.74); key.quadraticCurveTo(-0.105, 0.82, -0.135, 0.867);
+  key.absarc(0, 0.98, 0.176, Math.PI + 0.7, -0.7, true);
+  key.quadraticCurveTo(0.105, 0.82, 0.105, 0.74); key.lineTo(0.105, 0.6); key.closePath();
+  const keyHole = new THREE.Path(); keyHole.absarc(0, 0.98, 0.128, 0, Math.PI*2, false); key.holes.push(keyHole);
   const sight = extrude(key, 0.09, M.gunDark, 0.012); sight.rotation.y = Math.PI/2; sight.position.set(5.03, 0, 0); rec.add(sight);   // x 5.03…5.14
-  at(rec, rbox(0.06, 0.024, 0.05, 0.006, M.gunDark), FX, 0.905, 0);                      // notch block at the bottom of the hole
-  at(rec, cylY(0.022, 0.03, M.gunDark, 16), FX, 0.925, 0);                               // post base
-  rec.add((()=>{ const m = profile(shape([[-0.016,0.93],[0.016,0.93],[0.016,SIGHT_Y - 0.01],[-0.004,SIGHT_Y + 0.005],[-0.016,SIGHT_Y + 0.005]]), 0.024, M.gunDark, 0.003); m.position.x = FX; return m; })());   // blade post, slanted top
-  const notchMark = engraved(g=>{ g.fillRect(28, 6, 8, 40); g.fillRect(14, 40, 36, 8); }, 64, 64, 0.04, 0.04, false); notchMark.rotation.y = Math.PI/2; notchMark.position.set(5.1515, 0.835, 0); rec.add(notchMark);
+  at(rec, rbox(0.06, 0.024, 0.05, 0.006, M.gunDark), FX, 0.855, 0);                      // notch block at the bottom of the hole
+  at(rec, cylY(0.022, 0.03, M.gunDark, 16), FX, 0.875, 0);                               // post base
+  rec.add((()=>{ const m = profile(shape([[-0.016,0.88],[0.016,0.88],[0.016,SIGHT_Y - 0.01],[-0.004,SIGHT_Y + 0.005],[-0.016,SIGHT_Y + 0.005]]), 0.024, M.gunDark, 0.003); m.position.x = FX; return m; })());   // blade post, slanted top
+  const notchMark = engraved(g=>{ g.fillRect(28, 6, 8, 40); g.fillRect(14, 40, 36, 8); }, 64, 64, 0.04, 0.04, false); notchMark.rotation.y = Math.PI/2; notchMark.position.set(5.1515, 0.8, 0); rec.add(notchMark);
   const yArrow = engraved(g=>{ g.fillRect(25, 4, 14, 32); g.beginPath(); g.moveTo(10, 34); g.lineTo(54, 34); g.lineTo(32, 60); g.closePath(); g.fill(); }, 64, 64, 0.075, 0.075, false, '#f2b705');
   yArrow.rotation.y = Math.PI/2; yArrow.position.set(5.1515, 0.775, 0); rec.add(yArrow);
   // regulator: plug + rounded-octagon milled cap; marks engraved on the cap face round the rim, the one at the top is in use.
