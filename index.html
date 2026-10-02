@@ -750,30 +750,58 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const strip = at(rec, box(0.85, 0.16, 0.02, M.carrier), 0.525, 0.57, 0.34); parts.bolt = strip;
   parts.portCover.push(strip);
 
-  // --- magazine: shell + rounds / follower / spring inside ---
+  // --- magazine: STANAG 30-round (K2 takes M16 magazines). Straight at the top, curving smoothly forward below the
+  // magwell; constant depth MDEP measured square to the walls; pressed ribs along the sides, stop ridge, sliding floorplate ---
   const mag = new THREE.Group(); rec.add(mag); parts.mag = mag;
-  // the body runs up inside the magwell so the top round sits just under the bolt (only the part below the receiver shows)
-  mag.add(profile(shape([[0.2,0.17],[1.14,0.17],[1.14,-0.3],[1.2,-1.1,1.34,-1.85],[0.6,-1.95],[0.44,-1.1,0.2,-0.3]]), 0.3, M.mag, 0.03));
-  [0.165, -0.165].forEach(z=>[0.42, 0.72, 0.98].forEach(x=>{
-    const rib = profile(shape([[x-0.03,-0.6],[x+0.03,-0.6],[x+0.13,-1.75],[x+0.07,-1.75]]), 0.02, M.mag, 0.008); rib.position.z = z - 0.01; mag.add(rib);
+  const MDEP = 0.94, MW = 0.3, MY0 = 0.17, MYC = -0.3, MYB = -1.92, MK = 0.11;          // top, start of curve, bottom, curvature
+  const magRear = y=>0.2 + (y < MYC ? MK*(MYC - y)*(MYC - y) : 0);                         // rear wall x at height y
+  const magSlope = y=>y < MYC ? 2*MK*(MYC - y) : 0;                                         // dx per unit drop
+  const magN = y=>{ const k = magSlope(y), l = Math.hypot(1, k); return new THREE.Vector2(1/l, k/l); };   // square to the wall, pointing forward
+  parts.magRear = magRear; parts.magSlope = magSlope; parts.MDEP = MDEP;
+  // side profile: rear wall down, square bottom, front wall (parallel to the rear) back up
+  const rearPts = [], frontPts = [];
+  for (let i=0;i<=40;i++){ const y = MY0 + (MYB - MY0)*i/40, n = magN(y); rearPts.push([magRear(y), y]); frontPts.push([magRear(y) + n.x*MDEP, y + n.y*MDEP]); }
+  const magBody = profile(shape([...rearPts, ...frontPts.reverse()]), MW, M.mag, 0.03); mag.add(magBody);
+  // pressed reinforcing ribs on each side: raised beads that follow the curve
+  const ribPath = f=>new THREE.CatmullRomCurve3([...Array(12)].map((_, i)=>{ const y = -0.42 + (MYB + 0.14 + 0.42)*i/11, n = magN(y); return new THREE.Vector3(magRear(y) + n.x*f*MDEP, y + n.y*f*MDEP, 0); }));
+  [MW/2 + 0.03, -MW/2 - 0.03].forEach(z=>[0.2, 0.5, 0.8].forEach(f=>{
+    const rib = shadowed(new THREE.Mesh(new THREE.TubeGeometry(ribPath(f), 40, 0.022, 8, false), M.mag)); rib.scale.z = 0.45; rib.position.z = z/0.45*0.45; mag.add(rib);
   }));
-  const plate = at(mag, rbox(0.82, 0.08, 0.36, 0.03, M.mag), 0.97, -1.92, 0); plate.rotation.z = 0.13;
+  // over-insertion stop: a raised band round the body just under the magwell
+  { const n = magN(-0.3); const band = profile(shape([[magRear(-0.27) - 0.015, -0.27], [magRear(-0.27) + MDEP + 0.015, -0.27], [magRear(-0.35) + n.x*MDEP + 0.015, -0.35 + n.y*MDEP], [magRear(-0.35) - 0.015, -0.35]]), MW + 0.03, M.mag, 0.008); mag.add(band); }
+  // floorplate: slides on square to the walls, lips over the front and back, a dimple in the middle of its bottom
+  { const yb = MYB, n = magN(yb), ang = Math.atan2(n.y, n.x), cx = magRear(yb) + n.x*MDEP/2, cy = yb + n.y*MDEP/2;
+    const fp = new THREE.Group(); fp.position.set(cx, cy, 0); fp.rotation.z = ang; mag.add(fp);
+    at(fp, rbox(MDEP + 0.1, 0.07, MW + 0.08, 0.025, M.mag), 0, -0.03, 0);
+    at(fp, rbox(0.06, 0.09, MW + 0.06, 0.02, M.mag), MDEP/2 + 0.04, -0.045, 0);           // front lip, below the body
+    at(fp, rbox(0.05, 0.08, MW + 0.04, 0.015, M.mag), -MDEP/2 - 0.03, -0.005, 0);         // rear lip
+    at(fp, cylY(0.07, 0.006, M.black, 20), 0.05, -0.066, 0);                               // dimple
+    parts.magFloor = fp; }
+  // magazine catch window on the right side, hidden in the magwell when seated
+  at(mag, rbox(0.12, 0.06, 0.01, 0.01, M.black), 0.36, 0.0, MW/2 + 0.032);
   // feed lips curl over the outer edge of the top round: the open gap shows which side it sits on
   [0.115, -0.115].forEach(z=>at(mag, rbox(0.66, 0.04, 0.075, 0.015, M.mag), 0.62, 0.22, z));
-  const MTOP = new THREE.Vector2(0.66, 0.225), MBOT = new THREE.Vector2(0.95, -1.82), STEP = 0.05;
+  const MTOP = new THREE.Vector2(0.66, 0.225), MBOT = new THREE.Vector2(magRear(MYB + 0.08) + MDEP/2, MYB + 0.08), STEP = 0.05;
   parts.magRounds = [];
   const stack = new THREE.Group(); mag.add(stack); parts.stack = stack;
+  // rounds lie square to the walls, so lower in the curve their noses tip up (fanned like in a real curved magazine)
   for (let i=0;i<30;i++){
-    const t = i*STEP/(MTOP.y - MBOT.y);
-    const r = makeRound(true); r.rotation.z = -Math.PI/2;
-    r.position.set(MTOP.x + (MBOT.x - MTOP.x)*t - 0.38, MTOP.y - i*STEP, i % 2 ? 0.05 : -0.05);
+    const y = MTOP.y - i*STEP, r = makeRound(true);
+    r.rotation.z = -Math.PI/2 + Math.atan(magSlope(y));
+    r.position.set(magRear(y) + 0.07, y, i % 2 ? 0.05 : -0.05);
     stack.add(r); parts.magRounds.push(r);
   }
-  const follower = at(stack, rbox(0.7, 0.06, 0.22, 0.02, M.follower), 0.7, -0.4, 0); parts.follower = follower;
+  // follower (STANAG): a moulded block with a stepped top — one side raised to start the double stack — and a skirt
+  // hanging down front and back that keeps it from tipping
+  const follower = new THREE.Group(); stack.add(follower); parts.follower = follower;
+  at(follower, rbox(0.84, 0.05, 0.22, 0.018, M.follower), 0, 0, 0);
+  at(follower, rbox(0.5, 0.04, 0.1, 0.015, M.follower), 0.08, 0.04, 0.055);             // raised half
+  at(follower, rbox(0.84, 0.03, 0.03, 0.01, M.follower), 0, -0.03, 0);                   // spine
+  [0.4, -0.4].forEach(x=>at(follower, rbox(0.04, 0.16, 0.2, 0.012, M.follower), x, -0.09, 0));   // skirt legs
   // the round being stripped from the magazine into the chamber
   const fr = makeRound(true); fr.rotation.z = -Math.PI/2; fr.visible = false; rec.add(fr); parts.feedRound = fr;
   // flat magazine spring: base on the floor plate, top end fixed under the follower (stretched to it every frame)
-  const mspring = coil(0.11, 9, 0.012, M.spring); mag.add(mspring); parts.magSpring = mspring;
+  const mspring = coil(0.12, 9, 0.012, M.spring); mag.add(mspring); parts.magSpring = mspring;
   parts.MTOP = MTOP; parts.MBOT = MBOT; parts.MSTEP = STEP;
   tag(mag, 'mag');
 
@@ -827,17 +855,18 @@ function layoutMag(count){
   const n = Math.min(count, parts.magRounds.length), { MTOP, MBOT, MSTEP } = parts;
   // double stack: rounds alternate sides counted from the bottom, so the top one flips each shot (even count = 우상탄)
   parts.magRounds.forEach((r, i)=>{ r.visible = i < n; r.position.z = (count - i) % 2 === 0 ? 0.05 : -0.05; });
-  const fy = MTOP.y - n*MSTEP - 0.05, t = (MTOP.y - fy)/(MTOP.y - MBOT.y);
-  parts.follower.position.set(MTOP.x + (MBOT.x - MTOP.x)*t + 0.02, fy, 0);
-  parts.follower.rotation.z = 0.12;
+  // follower sits square to the walls just under the lowest round
+  const fy = MTOP.y - n*MSTEP - 0.05;
+  parts.follower.position.set(parts.magRear(fy) + parts.MDEP/2, fy, 0);
+  parts.follower.rotation.z = Math.atan(parts.magSlope(fy)) + 0.04;
   fitMagSpring();
 }
 // stretch the magazine spring from the floor plate to wherever the follower is right now (it rides with the stack)
 const _fa = new THREE.Vector3();
 function fitMagSpring(){
   const { MBOT } = parts, f = parts.follower, s = parts.magSpring;
-  _fa.set(f.position.x + 0.05, f.position.y + parts.stack.position.y - 0.03, 0);
-  const bx = MBOT.x + 0.04, by = MBOT.y + 0.03, dx = _fa.x - bx, dy = _fa.y - by;
+  _fa.set(f.position.x, f.position.y + parts.stack.position.y - 0.05, 0);
+  const bx = MBOT.x, by = MBOT.y, dx = _fa.x - bx, dy = _fa.y - by;
   s.position.set(bx, by, 0);
   s.rotation.z = -Math.atan2(dx, dy);
   s.scale.set(2.3, Math.max(0.05, Math.hypot(dx, dy)), 1);   // flattened: a magazine spring is wider than deep
