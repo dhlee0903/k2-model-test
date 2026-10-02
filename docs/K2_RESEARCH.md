@@ -34,6 +34,12 @@ https://archive.org/details/gunmanual_Daewoo_Dr200 (텍스트: https://archive.o
 - K2: **4단 — 0(총류탄/차단), 소(더운 날씨), 중(정상/사계절), 대(추운/악조건)** (나무위키).
 - DR200: 0 / L / M / S, 걸쇠를 누르고 돌림.
 
+## 6-1. 가스조절기·가늠쇠 모양 (DR200 사용설명서)
+- "The gas regulator is mounted at the front to the cylinder and has a milled cap which can be rotated to one of the positions marked respectively 0, L, M and S. To rotate the gas regulator, depress the detent (Fig. 5)…" — https://archive.org/details/gunmanual_Daewoo_Dr200
+- 가늠쇠 위 화살표에 표시를 맞춘다. 조절기 단추를 눌러 돌린다 — https://www.ar15.com/forums/t_6_2/196011_.html
+- K2 표시는 대·중·소·0. 개선형은 L·M·S·0. 단추를 누르고 돌린다 — https://namu.wiki/w/K2%20%EC%86%8C%EC%B4%9D
+- 가늠쇠: "Front sight post with protective ring." (DR200 설명서). 사용자 근접 사진: 평평한 앞면에 노란 화살표, 고리 아래 홈에 칼날 가늠쇠.
+
 ## 7. 분해
 - 앞 분해핀 축으로 윗총몸이 열림(복좌용수철 supporter를 눌러 풂). 핀을 안 빼도 "ㄱ"자로 열어 청소 가능.
 - DR200 순서: 복좌용수철 뭉치 → 장전손잡이 → 분해핀 빼서 위/아래 분리 → 총열덮개 → 노리쇠뭉치 분해.

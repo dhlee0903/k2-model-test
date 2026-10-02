@@ -228,6 +228,12 @@ function extrude(shape, depth, mat, bevel=0.02){
 }
 // side profile (XY) extruded across Z, centred on z=0
 function profile(shape, depth, mat, bevel){ const m = extrude(shape, depth, mat, bevel); m.position.z = -depth/2; return m; }
+// squeeze an extruded profile's thickness (z) with a factor that depends on x/y — gives moulded parts a rounded, tapering body
+function taperZ(mesh, depth, f){
+  const p = mesh.geometry.attributes.position;
+  for (let i=0;i<p.count;i++){ const z = p.getZ(i) - depth/2; p.setZ(i, z*f(p.getX(i), p.getY(i)) + depth/2); }
+  p.needsUpdate = true; mesh.geometry.computeVertexNormals(); return mesh;
+}
 function shape(pts){ const s = new THREE.Shape(); s.moveTo(...pts[0]); pts.slice(1).forEach(p=>p.length === 4 ? s.quadraticCurveTo(...p) : s.lineTo(...p)); return s; }
 function spring(pos, vel, target, k, c, dt){ const a = -k*(pos-target) - c*vel; vel += a*dt; pos += vel*dt; return [pos, vel]; }
 class Helix extends THREE.Curve {
@@ -260,13 +266,13 @@ function word(txt, color='#e9e9e9', h=0.085){
 }
 // text engraved into a flat face: dark cut letters with a light lower lip, bump-mapped so they read as cut in.
 // draw(g) paints with the current fillStyle into a W×H canvas that covers w×h units; faces -z when left = true
-function engraved(draw, W, H, w, h, left){
+function engraved(draw, W, H, w, h, left, ink = 'rgba(14,15,16,.9)'){
   const cv = document.createElement('canvas'), bm = document.createElement('canvas');
   cv.width = bm.width = W; cv.height = bm.height = H;
   const g = cv.getContext('2d'), gb = bm.getContext('2d');
   gb.fillStyle = '#fff'; gb.fillRect(0, 0, W, H);
   g.save(); g.translate(1.5, 1.5); g.fillStyle = 'rgba(210,214,218,.5)'; draw(g); g.restore();
-  g.fillStyle = 'rgba(14,15,16,.9)'; draw(g);
+  g.fillStyle = ink; draw(g);
   gb.fillStyle = '#000'; draw(gb);
   const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map:tex, bumpMap:new THREE.CanvasTexture(bm), bumpScale:0.004,
@@ -311,11 +317,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rs, cylZ(0.09, 0.012, M.dsteel, 32), -0.6, 0.86, 0.275);
   at(rs, cylZ(0.03, 0.02, M.steel, 16), -0.6, 0.86, 0.28);                           // centre screw
   for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(rs, cylZ(0.014, 0.016, M.black, 8), -0.6 + Math.cos(a)*0.06, 0.86 + Math.sin(a)*0.06, 0.28); }
-  const flip = new THREE.Group(); flip.position.set(-0.8, 0.96, 0); rs.add(flip);
-  at(flip, rbox(0.035, 0.15, 0.2, 0.012, M.gunDark), 0.02, 0.075, 0);               // upright leaf (sight line goes through its hole)
-  at(flip, rbox(0.15, 0.035, 0.2, 0.012, M.gunDark), -0.06, 0.02, 0);               // second leaf lying back
-  at(flip, cylZ(0.022, 0.24, M.dsteel, 12), 0, 0, 0);                                // flip pivot
-  at(rs, cylX(0.022, 0.04, M.black, 12), -0.78, SIGHT_Y, 0);
+  // protective side walls (ears) either side of the aperture, rounded tops
+  [0.15, -0.15].forEach(z=>{ const w = profile(shape([[-0.95,0.9],[-0.95,1.01],[-0.93,1.06,-0.86,1.06],[-0.76,1.06],[-0.69,1.06,-0.67,1.0],[-0.62,0.96],[-0.88,0.96]]), 0.045, M.gun, 0.012); w.position.z += z; rs.add(w); });
+  // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
+  // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
+  const flip = new THREE.Group(); flip.position.set(-0.8, 0.965, 0); rs.add(flip); parts.flip = flip;
+  const leaf = (hole, h)=>{ const sh = new THREE.Shape(); sh.moveTo(-0.075, 0); sh.lineTo(0.075, 0); sh.lineTo(0.075, h - 0.03); sh.quadraticCurveTo(0.075, h, 0.045, h); sh.lineTo(-0.045, h); sh.quadraticCurveTo(-0.075, h, -0.075, h - 0.03); sh.closePath();
+    const ho = new THREE.Path(); ho.absarc(0, SIGHT_Y - 0.965, hole, 0, Math.PI*2, true); sh.holes.push(ho);
+    const m = extrude(sh, 0.022, M.gunDark, 0.006); m.rotation.y = Math.PI/2; m.position.x = -0.011; return m; };
+  flip.add(leaf(0.012, 0.125));                                                         // small aperture, standing
+  const leafB = leaf(0.03, 0.115); const leafBG = new THREE.Group(); leafBG.rotation.z = Math.PI/2; leafBG.add(leafB); flip.add(leafBG);   // large aperture, lying back
+  at(flip, cylZ(0.018, 0.26, M.dsteel, 12), 0, 0, 0);                                 // cross pin
+  tag(flip, 'rearsight');
   at(rs, cylZ(0.045, 0.02, M.dsteel, 20), -0.62, 0.86, -0.225); at(rs, box(0.07, 0.01, 0.006, M.black), -0.62, 0.86, -0.237);   // left-side screw
   // right side (close-up photo): one long charging-handle slot, opening up into the ejection port at its front end
   const port = at(rec, box(0.85, 0.18, 0.02, M.black), 0.525, 0.57, 0.335);
@@ -345,7 +358,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   trig.add(profile(shape([[0.05,0.03],[-0.2,0.05],[-0.22,0.0],[-0.06,-0.06],[-0.17,-0.2,-0.15,-0.34],[-0.1,-0.35],[-0.11,-0.2,0.04,-0.08]]), 0.07, M.dsteel, 0.01));
   rec.add(trig); parts.trigger = trig;
   // --- pistol grip (photo: top x -1.0…-0.5 under the receiver, bottom x -1.5…-0.95 at y≈-1.4), finger bump, checkered panels ---
-  rec.add(profile(shape([[-0.46,-0.18],[-1.0,-0.18],[-1.07,-0.26],[-1.47,-1.2],[-1.52,-1.36,-1.38,-1.41],[-1.0,-1.45],[-0.86,-1.43,-0.88,-1.31],[-0.76,-1.0],[-0.64,-0.84,-0.68,-0.72],[-0.52,-0.36]]), 0.42, M.gripPoly, 0.05));
+  // A2-style moulding (photo): smooth body with a finger ridge on the front strap, a beavertail tucked under the receiver,
+  // fuller in the middle than at the top, checkered panels let into both sides, flat base with a cap
+  const gripBody = profile(shape([[-0.46,-0.18],[-1.02,-0.18],[-1.12,-0.22],[-1.13,-0.3],[-1.08,-0.34],[-1.47,-1.2],[-1.53,-1.37,-1.38,-1.42],[-1.0,-1.46],
+    [-0.86,-1.44,-0.88,-1.31],[-0.82,-1.12,-0.77,-1.02],[-0.74,-0.98,-0.72,-0.92],[-0.66,-0.8,-0.68,-0.68],[-0.52,-0.36]]), 0.36, M.poly, 0.06);
+  taperZ(gripBody, 0.36, (x, y)=>0.86 + 0.14*Math.sin(THREE.MathUtils.clamp((-0.2 - y)/1.25, 0, 1)*Math.PI));
+  rec.add(gripBody);
+  [1, -1].forEach(sd=>{
+    const pnl = profile(shape([[-0.64,-0.34],[-0.98,-0.36],[-1.36,-1.2],[-1.33,-1.3],[-1.05,-1.33],[-0.93,-1.27],[-0.84,-1.06],[-0.74,-0.86],[-0.64,-0.56]]), 0.012, M.gripPoly, 0.004);
+    pnl.position.z = sd*0.232 - 0.006; rec.add(pnl);
+  });
+  at(rec, rbox(0.5, 0.025, 0.3, 0.012, M.poly), -1.2, -1.44, 0).rotation.z = 0.08;              // base cap
+  at(rec, cylY(0.025, 0.01, M.black, 12), -1.2, -1.456, 0);
   // --- selector (left, photo): pear-shaped lever on its pivot, pointed tip at the selected mark, round thumb knob on the
   // opposite end. Seen from the left the muzzle is to the viewer's left; K2 marks run clockwise from the muzzle side:
   // 안전 (toward the muzzle) → 단발 (up) → 연발 (toward the stock, under the knob on safe) → 점사 (down), all the way round
@@ -380,10 +404,13 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // bolt catch (노리쇠멈치, photos): left side just behind the magwell, ribbed paddle on top of a long lever, no lower
   // button (K2 differs from the AR here: you lock the bolt back by pulling the paddle UP, and press it DOWN to release)
   const bc = new THREE.Group(); bc.position.set(0.06, 0.0, LZ - 0.012); rec.add(bc); parts.boltCatch = bc;
-  at(bc, rbox(0.15, 0.07, 0.03, 0.01, M.dsteel), 0, 0.07, -0.01);
-  for (let k=-2;k<=2;k++) at(bc, box(0.008, 0.06, 0.006, M.black), k*0.025, 0.07, -0.027);
-  at(bc, rbox(0.045, 0.2, 0.02, 0.008, M.dsteel), 0.0, -0.05, 0);
-  at(bc, cylZ(0.018, 0.03, M.steel, 12), 0.0, -0.13, -0.005);
+  at(rec, rbox(0.07, 0.26, 0.006, 0.01, M.black), 0.075, -0.02, LZ - 0.001);          // recess the arm sits in
+  const pad = new THREE.Shape(); pad.absellipse(0, 0, 0.072, 0.046, 0, Math.PI*2, false, 0);
+  const padM = extrude(pad, 0.014, M.dsteel, 0.006); padM.position.set(0, 0.075, -0.026); bc.add(padM);
+  for (let k=-3;k<=3;k++){ const y = k*0.011, w = 2*0.066*Math.sqrt(Math.max(0, 1 - (y/0.044)**2)); at(bc, box(w, 0.004, 0.004, M.black), 0, 0.075 + y, -0.034); }   // ribs
+  at(bc, rbox(0.04, 0.17, 0.018, 0.008, M.dsteel), 0.015, -0.03, -0.006);              // arm down to the pivot
+  at(bc, rbox(0.05, 0.05, 0.018, 0.01, M.dsteel), 0.005, 0.03, -0.01);                  // neck under the paddle
+  at(bc, cylZ(0.013, 0.03, M.steel, 12), 0.015, -0.1, -0.008);                          // roll pin
   tag(bc, 'boltcatch');
   // rear sling loop (photo): swivel block at the back of the lower on the left, big D-loop hanging from it
   at(rec, rbox(0.12, 0.12, 0.05, 0.02, M.gun), -1.17, 0.02, LZ - 0.02);
@@ -404,10 +431,26 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.36);
   const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.31); rec.add(hinge); parts.stock = hinge;
   const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.31); hinge.add(sg);
-  // photo: top almost level (0.47 at the hinge → 0.57 at the butt), bottom a straight slope from the butt's lower corner
-  // (-4.0, -0.72) up to the wrist (-1.57, -0.06); butt end slightly convex with rounded corners, no separate pad
-  sg.add(profile(shape([[-1.52,0.47],[-4.08,0.57],[-4.3,0.57,-4.31,0.42],[-4.36,-0.08,-4.24,-0.56],[-4.18,-0.73,-4.0,-0.73],[-1.52,-0.05]]), 0.42, M.poly, 0.07));
-  at(sg, cylZ(0.035, 0.44, M.dsteel, 12), -3.75, -0.6, 0);
+  // photos: top almost level (0.47 at the hinge → 0.57 at the butt); underside sweeps up in a concave curve from the
+  // butt's lower corner into a slim, nearly level wrist at the hinge; rounded moulding that is thinner at the wrist
+  // than at the butt; butt plate with grooves; metal hinge plate on the front end
+  const stockBody = profile(shape([[-1.6,0.47],[-4.08,0.57],[-4.28,0.57,-4.29,0.42],[-4.33,-0.08,-4.24,-0.56],[-4.19,-0.73,-4.0,-0.73],
+    [-3.2,-0.6,-2.55,-0.2],[-2.3,-0.07,-1.95,-0.05],[-1.6,-0.05]]), 0.4, M.poly, 0.075);
+  taperZ(stockBody, 0.4, x=>THREE.MathUtils.lerp(0.78, 1.0, THREE.MathUtils.smoothstep(-x, 1.8, 3.4)));
+  sg.add(stockBody);
+  // shallow moulded panel line along each side
+  [1, -1].forEach(sd=>{
+    const ln = profile(shape([[-2.2,0.4],[-3.95,0.48],[-4.05,0.46,-4.06,0.36],[-4.09,-0.08,-4.02,-0.5],[-3.98,-0.6,-3.86,-0.6],[-3.1,-0.48,-2.6,-0.12],[-2.4,-0.03,-2.2,0.0]]), 0.004, M.gripPoly, 0.0);
+    ln.material = M.poly; ln.position.z = sd*0.272 - 0.002; ln.scale.z = 1; sg.add(ln);
+  });
+  // butt plate: separate darker pad on the end with horizontal grooves
+  const bp = profile(shape([[-4.27,0.55],[-4.36,0.55],[-4.37,0.42],[-4.41,-0.08,-4.32,-0.56],[-4.27,-0.72],[-4.2,-0.72],[-4.25,-0.56,-4.33,-0.08],[-4.29,0.42]]), 0.46, M.rubber, 0.03);
+  sg.add(bp);
+  for (let k=0;k<12;k++){ const y = 0.45 - k*0.1; at(sg, box(0.012, 0.012, 0.44, M.black), -4.39 + Math.abs(y + 0.08)*0.12, y, 0); }
+  // hinge plate at the front of the stock, two screws
+  at(sg, rbox(0.1, 0.5, 0.44, 0.02, M.gunDark), -1.57, 0.21, 0);
+  [0.38, 0.04].forEach(y=>[1, -1].forEach(sd=>{ at(sg, cylZ(0.025, 0.01, M.dsteel, 12), -1.57, y, sd*0.222); at(sg, box(0.035, 0.006, 0.004, M.black), -1.57, y, sd*0.228); }));
+  at(sg, cylZ(0.035, 0.42, M.dsteel, 12), -3.75, -0.62, 0);                              // sling pin through the butt
   tag(hinge, 'stock');
   // --- deeply fluted handguard, end caps, exposed gas tube over the barrel ---
   // photo: handguard x 1.41…3.18, y 0.05…0.77
@@ -423,23 +466,40 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, cylX(0.12, 0.3, M.gunDark, 24), 1.25, BORE, 0);               // barrel extension / chamber
   // --- gas block + ringed front sight + sling swivel + bayonet lug ---
   at(rec, rbox(0.34, 0.44, 0.26, 0.04, M.gunDark), 4.97, 0.5, 0);
-  // gas regulator: plug in the gas block with a rotating head, 4 settings (0 차단 / 소 더운 날씨 / 중 정상 / 대 악조건)
-  const gas = new THREE.Group(); gas.position.set(5.16, 0.64, 0); rec.add(gas); parts.gas = gas;
-  at(gas, cylX(0.075, 0.12, M.steel, 20), 0, 0, 0);
-  at(gas, rbox(0.1, 0.2, 0.17, 0.04, M.dsteel), 0.1, 0, 0);
-  at(gas, cylX(0.04, 0.08, M.dsteel, 16), 0.17, 0.05, 0);
-  const arrow = at(gas, box(0.01, 0.025, 0.08, new THREE.MeshBasicMaterial({ color:0xf5c518 })), 0.152, -0.05, 0);
-  parts.GAS_ANG = [-Math.PI*0.5, -Math.PI/6, Math.PI/6, Math.PI*0.5];
-  [['0', 0], ['소', 1], ['중', 2], ['대', 3]].forEach(([t, i])=>{
-    const l = label(t, i === 2 ? '#f5c518' : '#e9e9e9', 0.075); l.rotation.y = Math.PI/2;
-    const a = parts.GAS_ANG[i];   // arrow points down at 0°, so mark where it lands for each setting
-    l.position.set(5.152, 0.64 - Math.cos(a)*0.15, -Math.sin(a)*0.15);
-    rec.add(l); tag(l, 'gas');
+  // front sight + gas regulator (close-up photos, DR200 manual Fig. 5). The sight is one flat-fronted "keyhole" piece on
+  // the front of the gas block: thick ring on top, neck tapering down to a boss round the regulator, a yellow arrow painted
+  // on its face pointing down at the regulator. The post is a blade standing in a notch at the bottom of the ring.
+  const FX = 5.085;                                                                      // ring / post centre (x)
+  const key = new THREE.Shape();
+  key.moveTo(-0.105, 0.6); key.lineTo(-0.105, 0.76); key.quadraticCurveTo(-0.105, 0.86, -0.135, 0.917);
+  key.absarc(0, 1.03, 0.176, Math.PI + 0.7, -0.7, true);
+  key.quadraticCurveTo(0.105, 0.86, 0.105, 0.76); key.lineTo(0.105, 0.6); key.closePath();
+  const keyHole = new THREE.Path(); keyHole.absarc(0, 1.03, 0.128, 0, Math.PI*2, false); key.holes.push(keyHole);
+  const sight = extrude(key, 0.09, M.gunDark, 0.012); sight.rotation.y = Math.PI/2; sight.position.set(5.03, 0, 0); rec.add(sight);   // x 5.03…5.14
+  at(rec, rbox(0.06, 0.024, 0.05, 0.006, M.gunDark), FX, 0.905, 0);                      // notch block at the bottom of the hole
+  at(rec, cylY(0.022, 0.03, M.gunDark, 16), FX, 0.925, 0);                               // post base
+  rec.add((()=>{ const m = profile(shape([[-0.016,0.93],[0.016,0.93],[0.016,SIGHT_Y - 0.01],[-0.004,SIGHT_Y + 0.005],[-0.016,SIGHT_Y + 0.005]]), 0.024, M.gunDark, 0.003); m.position.x = FX; return m; })());   // blade post, slanted top
+  const notchMark = engraved(g=>{ g.fillRect(28, 6, 8, 40); g.fillRect(14, 40, 36, 8); }, 64, 64, 0.04, 0.04, false); notchMark.rotation.y = Math.PI/2; notchMark.position.set(5.1515, 0.835, 0); rec.add(notchMark);
+  const yArrow = engraved(g=>{ g.fillRect(25, 4, 14, 32); g.beginPath(); g.moveTo(10, 34); g.lineTo(54, 34); g.lineTo(32, 60); g.closePath(); g.fill(); }, 64, 64, 0.075, 0.075, false, '#f2b705');
+  yArrow.rotation.y = Math.PI/2; yArrow.position.set(5.1515, 0.775, 0); rec.add(yArrow);
+  // regulator: plug + rounded-octagon milled cap; marks engraved on the cap face round the rim, the one at the top is in use.
+  // Seen from the muzzle they run clockwise 중 (top) → 소 → 0 → 대; press the checkered detent on the side to turn it.
+  const gas = new THREE.Group(); gas.position.set(5.14, 0.64, 0); rec.add(gas); parts.gas = gas;
+  at(gas, cylX(0.07, 0.03, M.gunDark, 28), 0.015, 0, 0);
+  const oct = new THREE.Shape(); for (let k=0;k<8;k++){ const a = k*Math.PI/4 + Math.PI/8, r = 0.098; k ? oct.lineTo(Math.cos(a)*r, Math.sin(a)*r) : oct.moveTo(Math.cos(a)*r, Math.sin(a)*r); } oct.closePath();
+  const capM = extrude(oct, 0.05, M.gunDark, 0.014); capM.rotation.y = Math.PI/2; capM.position.x = 0.032; gas.add(capM);   // face at x ≈ 0.096
+  const GAS_MARK = ['0', '소', '중', '대'], GAS_POS = [2, 1, 0, 3];                        // clockwise quarter-turns from the top (seen from the front)
+  GAS_MARK.forEach((t, i)=>{
+    const m = engraved(g=>{ g.font = '44px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, 32, 34); }, 64, 64, 0.05, 0.05, false);
+    m.material.bumpScale = 0.002; m.rotation.y = Math.PI/2; m.position.set(0.0975, 0.06, 0);
+    const holder = new THREE.Group(); holder.rotation.x = -GAS_POS[i]*Math.PI/2; holder.add(m); gas.add(holder);
   });
-  tag(gas, 'gas');
-  at(rec, rbox(0.12, 0.14, 0.12, 0.02, M.gunDark), 4.97, 0.78, 0);
-  at(rec, box(0.035, 0.2, 0.035, M.gunDark), 4.97, SIGHT_Y - 0.1, 0);
-  const hood = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.034, 12, 32), M.gunDark); hood.rotation.y = Math.PI/2; at(rec, shadowed(hood), 4.97, 1.03, 0);
+  parts.GAS_ANG = GAS_MARK.map((_, i)=>GAS_POS[i]*Math.PI/2);                            // group rotation that puts mark i at the top
+  gas.rotation.x = parts.GAS_ANG[2];
+  const detent = new THREE.Group(); detent.position.set(5.12, 0.63, 0.13); rec.add(detent); parts.gasDetent = detent;
+  at(detent, cylZ(0.028, 0.05, M.gunDark, 20), 0, 0, 0.02);
+  const dFace = new THREE.Mesh(new THREE.CircleGeometry(0.026, 20), new THREE.MeshStandardMaterial({ color:0x3a3d40, roughness:0.6, metalness:0.6, bumpMap:gripBump, bumpScale:0.01 })); at(detent, dFace, 0, 0, 0.0455);
+  tag(gas, 'gas'); tag(detent, 'gas');
   // front sling swivel (photo): band clamped round the barrel, lug under it, D-ring hanging from the swivel pin
   at(rec, cylX(0.1, 0.08, M.gunDark, 24), 4.62, BORE, 0);
   at(rec, rbox(0.08, 0.08, 0.07, 0.015, M.gunDark), 4.62, 0.26, 0);
@@ -449,8 +509,13 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   dring.holes.push(dpath);
   const dr = extrude(dring, 0.02, M.dsteel, 0.006); dr.position.set(4.62, 0.24, -0.01); rec.add(dr);
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
-  // --- slotted flash hider ---
-  at(rec, cylX(0.1, 0.75, M.gunDark, 28), 6.79, BORE, 0);
+  // --- slotted flash hider: a tube, open at the front, the barrel's bore at the bottom of it ---
+  M.bore = M.bore || new THREE.MeshStandardMaterial({ color:0x111213, roughness:0.6, metalness:0.6, side:THREE.BackSide });
+  const fh = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.75, 28, 1, true), M.gunDark)); fh.rotation.z = Math.PI/2; at(rec, fh, 6.79, BORE, 0);
+  const fhIn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.75, 24, 1, true), M.bore); fhIn.rotation.z = Math.PI/2; at(rec, fhIn, 6.79, BORE, 0);
+  const lip = shadowed(new THREE.Mesh(new THREE.RingGeometry(0.06, 0.1, 28), M.gunDark)); lip.rotation.y = Math.PI/2; at(rec, lip, 7.165, BORE, 0);
+  const crown = new THREE.Mesh(new THREE.RingGeometry(0.026, 0.06, 24), M.bore); crown.rotation.y = -Math.PI/2; at(rec, crown, 6.42, BORE, 0);
+  at(rec, cylX(0.026, 0.01, M.black, 16), 6.416, BORE, 0);                                  // the bore itself
   at(rec, cylX(0.11, 0.05, M.gunDark, 28), 6.42, BORE, 0);
   for (let k=0;k<5;k++){ const a = k*Math.PI*2/5 + 0.3; at(rec, box(0.45, 0.025, 0.02, M.black), 6.86, BORE + Math.sin(a)*0.1, Math.cos(a)*0.1).rotation.x = a; }
   parts.muzzle = at(rec, new THREE.Object3D(), 7.17, BORE, 0);
@@ -467,17 +532,23 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     parts.explode.push({ g, base:g.position.clone(), off:new THREE.Vector3(...off), label:sp, stage });
     return g;
   }
-  // carrier body (x 0.12…1.12): block around the bore with lightening cuts, cam-pin track on top, bolt bore in front,
-  // ejection-side window, mount block on top for the operating-rod tube
-  const body = piece('노리쇠뭉치', 0.62, 0.42, 0, [0, 0, 0], [0, 0.42, 0], carrier, 1);
-  at(body, rbox(1.0, 0.26, 0.24, 0.035, M.carrier), 0, 0, 0);
-  [0.123, -0.123].forEach(z=>{ at(body, box(0.5, 0.05, 0.006, M.black), -0.18, 0.06, z); at(body, box(0.5, 0.012, 0.006, M.black), -0.18, -0.07, z); });
-  at(body, rbox(0.3, 0.1, 0.008, 0.004, M.black), 0.22, -0.02, 0.122);                // ejection-side window
-  at(body, box(0.22, 0.006, 0.07, M.black), 0.24, 0.131, 0);                         // cam-pin track
-  at(body, cylX(0.07, 0.006, M.black, 20), 0.502, -0.04, 0);                          // bolt bore
-  at(body, cylX(0.03, 0.006, M.black, 12), -0.502, -0.04, 0);                         // firing-pin hole at the back
-  at(body, rbox(0.3, 0.07, 0.12, 0.015, M.carrier), 0.0, 0.16, 0);                   // tube mount block
-  [-0.07, 0.07].forEach(x=>at(body, cylY(0.016, 0.01, M.black, 10), x, 0.196, 0));    // its two screws
+  // carrier body (x 0.12…1.12, photos: round like an AR carrier): cylinder on the bore axis, slimmer at the back,
+  // windows cut in the sides, curved cam-pin track on top, mount block for the op-rod tube, boss for the charging handle
+  const body = piece('노리쇠뭉치', 0.62, BORE, 0, [0, 0, 0], [0, 0.34, 0], carrier, 1);
+  // a black patch on the cylinder surface spanning angle th0±thw (0 = right side, π/2 = top), x c±len/2
+  const cut = (r, c, len, th0, thw)=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10, 1, true, th0 - thw, thw*2), M.black); m.rotation.z = Math.PI/2; m.position.x = c; body.add(m); return m; };
+  at(body, cylX(0.1, 0.34, M.carrier, 32), -0.33, 0, 0);
+  at(body, cylX(0.105, 0.66, M.carrier, 32), 0.17, 0, 0);
+  at(body, cylX(0.108, 0.04, M.carrier, 32), 0.48, 0, 0);                               // front lip
+  cut(0.1062, 0.24, 0.3, 0, 0.42);                                                      // ejection-side window (right)
+  cut(0.1062, -0.02, 0.22, Math.PI, 0.4);                                               // left window
+  cut(0.1062, 0.24, 0.2, Math.PI/2, 0.2);                                               // cam-pin track (top)
+  cut(0.1012, -0.33, 0.04, Math.PI, 0.2);                                               // retaining-pin hole (left)
+  at(body, cylX(0.068, 0.006, M.black, 24), 0.502, 0, 0);                               // bolt bore at the front
+  at(body, cylX(0.03, 0.006, M.black, 12), -0.502, 0, 0);                               // firing-pin hole at the back
+  at(body, rbox(0.3, 0.1, 0.12, 0.02, M.carrier), 0.0, 0.135, 0);                      // op-rod tube mount
+  [-0.07, 0.07].forEach(x=>at(body, cylY(0.016, 0.01, M.black, 10), x, 0.186, 0));
+  at(body, rbox(0.12, 0.1, 0.1, 0.02, M.carrier), 0.31, 0.11, 0.08);                   // charging-handle boss
   // rotating bolt: 7 lugs + extractor at the face (x≈1.29), gas rings on the tail, cam-pin hole
   const bolt = piece('노리쇠', 1.0, BORE, 0, [1.3, -0.3, 0], [0.05, -0.2, 0]);
   at(bolt, cylX(0.04, 0.2, M.dsteel, 16), -0.32, 0, 0);                              // tail
@@ -496,10 +567,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(fpin, cylX(0.036, 0.04, M.steel, 14), -0.38, 0, 0);
   at(fpin, cylX(0.008, 0.04, M.steel, 8), 0.565, 0, 0);
   // cam pin: square head riding in the track on top of the carrier, shank down through the bolt
-  const cpin = piece('캠핀', 0.85, 0.465, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
-  at(cpin, cylY(0.026, 0.17, M.dsteel, 14), 0, 0, 0);
-  at(cpin, rbox(0.08, 0.03, 0.08, 0.008, M.dsteel), 0, 0.1, 0);
-  at(cpin, cylZ(0.009, 0.06, M.black, 8), 0, -0.085 + 0.0, 0);                    // hole the firing pin passes through
+  const cpin = piece('캠핀', 0.85, 0.43, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
+  at(cpin, cylY(0.026, 0.12, M.dsteel, 14), 0, 0, 0);
+  at(cpin, rbox(0.07, 0.025, 0.07, 0.008, M.dsteel), 0, 0.065, 0);
+  at(cpin, cylZ(0.009, 0.06, M.black, 8), 0, -0.04, 0);                    // hole the firing pin passes through
   // firing-pin retaining pin: cotter pin across the carrier behind the firing pin's flange, head on the left side
   const rpin = piece('공이고정핀', 0.29, BORE, 0, [-0.7, 0.85, 0], [0, 0.18, 0]);
   at(rpin, cylZ(0.01, 0.25, M.steel, 8), 0, 0, 0);
@@ -551,7 +622,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const plate = at(mag, rbox(0.82, 0.08, 0.36, 0.03, M.mag), 0.97, -1.92, 0); plate.rotation.z = 0.13;
   // feed lips curl over the outer edge of the top round: the open gap shows which side it sits on
   [0.115, -0.115].forEach(z=>at(mag, rbox(0.66, 0.04, 0.075, 0.015, M.mag), 0.62, 0.22, z));
-  const MTOP = new THREE.Vector2(0.66, 0.235), MBOT = new THREE.Vector2(0.95, -1.82), STEP = 0.05;
+  const MTOP = new THREE.Vector2(0.66, 0.225), MBOT = new THREE.Vector2(0.95, -1.82), STEP = 0.05;
   parts.magRounds = [];
   const stack = new THREE.Group(); mag.add(stack); parts.stack = stack;
   for (let i=0;i<30;i++){
@@ -642,7 +713,11 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.Shado
 ground.rotation.x = -Math.PI/2; ground.position.y = -3.4; ground.receiveShadow = true; scene.add(ground);
 
 // ---------- range ----------
-const RANGE_GROUND = -17, TARGET_X = 200, TSIZE = 14;
+const RANGE_GROUND = -17, TARGET_X = 200;
+// 25 m zeroing sheet (25m 영점표적지 K2): 26 × 34 grid of 1-cell squares, columns 13…0…13, rows 19 above to 15 below
+// the zero point. Canvas 1024×1536 maps onto a TW × TH plane.
+const TW = 14, TH = 21, TCV = { W:1024, H:1536, CELL:36.6, X0:512, Y0:841 };
+const ZERO_UP = 1.4;                  // the black aiming dot sits 1.4 cells above the zero point (a zeroed rifle aimed at it hits the zero)
 const range = new THREE.Group(); range.visible = false; scene.add(range);
 const aim = new THREE.Group(); aim.rotation.order = 'YZX'; scene.add(aim);
 let targetCanvas, targetTex, target;
@@ -655,27 +730,71 @@ let targetCanvas, targetTex, target;
   grass.rotation.x = -Math.PI/2; grass.position.y = RANGE_GROUND; range.add(grass);
   const berm = new THREE.Mesh(new THREE.BoxGeometry(30, 40, 400), new THREE.MeshStandardMaterial({ color:0x9a7b55, roughness:1 }));
   berm.position.set(TARGET_X + 40, RANGE_GROUND + 14, 0); berm.rotation.z = 0.5; range.add(berm);
-  targetCanvas = document.createElement('canvas'); targetCanvas.width = targetCanvas.height = 512;
+  targetCanvas = document.createElement('canvas'); targetCanvas.width = TCV.W; targetCanvas.height = TCV.H;
   drawTarget();
   targetTex = new THREE.CanvasTexture(targetCanvas); targetTex.encoding = THREE.sRGBEncoding;
-  target = new THREE.Mesh(new THREE.PlaneGeometry(TSIZE, TSIZE), new THREE.MeshStandardMaterial({ map:targetTex, roughness:0.9 }));
-  target.rotation.y = -Math.PI/2; target.position.set(TARGET_X, 0, 0); range.add(target);
+  targetTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  target = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshStandardMaterial({ map:targetTex, roughness:0.95 }));
+  // hang it so the aiming dot is dead ahead of the sight line
+  const dotY = (0.5 - (TCV.Y0 - ZERO_UP*TCV.CELL)/TCV.H)*TH;
+  target.rotation.y = -Math.PI/2; target.position.set(TARGET_X, -dotY, 0); range.add(target);
   const wood = new THREE.MeshStandardMaterial({ color:0x8a6a45, roughness:0.9 });
-  [-6, 6].forEach(z=>{ const p = new THREE.Mesh(new THREE.BoxGeometry(0.8, 26, 0.8), wood); p.position.set(TARGET_X + 0.6, RANGE_GROUND + 11, z); range.add(p); });
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, TSIZE + 1, TSIZE + 1), wood); back.position.set(TARGET_X + 0.3, 0, 0); range.add(back);
+  [-8, 8].forEach(z=>{ const p = new THREE.Mesh(new THREE.BoxGeometry(0.8, 32, 0.8), wood); p.position.set(TARGET_X + 0.6, RANGE_GROUND + 14, z); range.add(p); });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, TH + 1.5, TW + 2), wood); back.position.set(TARGET_X + 0.3, target.position.y, 0); range.add(back);
   const bench = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 30), new THREE.MeshStandardMaterial({ color:0x6b7280, roughness:0.8 }));
   bench.position.set(4, -4.5, 0); range.add(bench);
 })();
 function drawTarget(){
-  const g = targetCanvas.getContext('2d'), C = 256;
-  g.fillStyle = '#f4efe2'; g.fillRect(0, 0, 512, 512);
-  for (let s=1; s<=10; s++){
-    const r = (11 - s) * 24;
-    g.beginPath(); g.arc(C, C, r, 0, Math.PI*2);
-    g.fillStyle = s >= 7 ? '#1b1b1b' : '#f4efe2'; g.fill();
-    g.strokeStyle = s >= 7 ? '#f4efe2' : '#1b1b1b'; g.lineWidth = 2; g.stroke();
-    if (s < 10){ g.fillStyle = s >= 7 ? '#f4efe2' : '#1b1b1b'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.fillText(s, C, C - r + 18); }
-  }
+  const g = targetCanvas.getContext('2d'), { W, H, CELL:C, X0, Y0 } = TCV;
+  const X = c => X0 + c*C, Y = r => Y0 - r*C;                 // grid coords (cells; +r up) → canvas
+  const ink = '#2b2b2b', KO = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+  g.fillStyle = '#efece3'; g.fillRect(0, 0, W, H);
+  // paper texture + fold lines
+  for (let i=0;i<4000;i++){ g.fillStyle = `rgba(0,0,0,${Math.random()*0.035})`; g.fillRect(Math.random()*W, Math.random()*H, 2, 2); }
+  g.strokeStyle = 'rgba(0,0,0,.06)'; g.lineWidth = 3; [[W/2, 0, W/2, H], [0, H/2, W, H/2]].forEach(([a,b,c,d])=>{ g.beginPath(); g.moveTo(a,b); g.lineTo(c,d); g.stroke(); });
+  g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `bold 58px ${KO}`; g.fillText('25m 영점표적지(K2)', W/2, 70);
+  // grid: thin every cell, thick every 5 and on the zero lines
+  for (let c=-13;c<=13;c++){ g.lineWidth = c % 5 === 0 ? 4 : 1.3; g.strokeStyle = ink; g.beginPath(); g.moveTo(X(c), Y(19)); g.lineTo(X(c), Y(-15)); g.stroke(); }
+  for (let r=-15;r<=19;r++){ g.lineWidth = r % 5 === 0 ? 4 : 1.3; g.beginPath(); g.moveTo(X(-13), Y(r)); g.lineTo(X(13), Y(r)); g.stroke(); }
+  g.font = `22px ${KO}`;
+  for (let c=-13;c<=13;c++){ g.fillText(Math.abs(c), X(c), Y(19) - 16); g.fillText(Math.abs(c), X(c), Y(-15) + 18); }
+  for (let r=-15;r<=19;r++){ g.fillText(Math.abs(r), X(-13) - 22, Y(r)); g.fillText(Math.abs(r), X(13) + 22, Y(r)); }
+  // black figure (cells): top bar, left leg, right leg
+  const FIG = [[-6, 6, 0, 8], [0, 5, 7, 9], [-6, 1, -3, 6], [4, 2, 7, 5]];
+  g.fillStyle = '#3a3a3a'; FIG.forEach(([c0, r0, c1, r1])=>g.fillRect(X(c0), Y(r1), (c1 - c0)*C, (r1 - r0)*C));
+  g.save(); g.beginPath(); FIG.forEach(([c0, r0, c1, r1])=>g.rect(X(c0), Y(r1), (c1 - c0)*C, (r1 - r0)*C)); g.clip();
+  g.strokeStyle = 'rgba(239,236,227,.55)'; g.lineWidth = 1.2;   // the grid shows faintly through the print
+  for (let c=-6;c<=7;c++){ g.beginPath(); g.moveTo(X(c), Y(9)); g.lineTo(X(c), Y(1)); g.stroke(); }
+  for (let r=1;r<=9;r++){ g.beginPath(); g.moveTo(X(-6), Y(r)); g.lineTo(X(7), Y(r)); g.stroke(); }
+  g.restore();
+  // aiming dot, zero circle and the zero mark
+  g.fillStyle = '#151515'; g.beginPath(); g.ellipse(X(0), Y(ZERO_UP), 0.72*C, 0.56*C, 0, 0, Math.PI*2); g.fill();
+  g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.arc(X(0), Y(0), 1.75*C, 0, Math.PI*2); g.stroke();
+  g.lineWidth = 2.5; [0, Math.PI/3, -Math.PI/3].forEach(a=>{ g.beginPath(); g.moveTo(X(0) - Math.cos(a)*9, Y(0) - Math.sin(a)*9); g.lineTo(X(0) + Math.cos(a)*9, Y(0) + Math.sin(a)*9); g.stroke(); });
+  // adjustment icons and their names
+  const drum = (c, r, cw)=>{ const x = X(c), y = Y(r); g.fillStyle = '#efece3'; g.beginPath(); g.arc(x, y, 0.95*C, 0, Math.PI*2); g.fill(); g.strokeStyle = ink; g.lineWidth = 2; g.stroke();
+    g.beginPath(); g.arc(x, y, 0.55*C, 0, Math.PI*2); g.stroke(); g.fillStyle = ink;
+    for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; g.beginPath(); g.arc(x + Math.cos(a)*0.32*C, y + Math.sin(a)*0.32*C, 3.5, 0, Math.PI*2); g.fill(); }
+    g.beginPath(); g.arc(x, y, 4, 0, Math.PI*2); g.fill();
+    g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, 1.2*C, cw ? -2.4 : -0.74, cw ? -0.74 : -2.4, !cw); g.stroke();
+    const ea = cw ? -0.74 : -2.4, ex = x + Math.cos(ea)*1.2*C, ey = y + Math.sin(ea)*1.2*C;
+    g.beginPath(); g.moveTo(ex, ey + 9); g.lineTo(ex - 7, ey - 3); g.lineTo(ex + 7, ey - 3); g.closePath(); g.fill(); };
+  const screw = (c, r, up)=>{ const x = X(c), y = Y(r); g.fillStyle = '#efece3'; g.fillRect(x - 0.9*C, y - 0.9*C, 1.8*C, 1.8*C);
+    g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 0.6*C, y + 0.5*C); g.lineTo(x - 0.6*C, y - 0.1*C); g.lineTo(x, y - 0.6*C); g.lineTo(x + 0.6*C, y - 0.1*C); g.lineTo(x + 0.6*C, y + 0.5*C); g.closePath(); g.stroke();
+    g.fillRect(x - 0.35*C, y - 0.75*C, 0.7*C, 0.2*C); g.beginPath(); g.arc(x, y + 0.15*C, 0.2*C, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.moveTo(x + 0.9*C, y + 0.6*C); g.lineTo(x + 0.9*C, y - 0.6*C); g.stroke(); g.beginPath(); g.moveTo(x + 0.9*C, y + (up ? -0.75 : 0.75)*C); g.lineTo(x + 0.75*C, y + (up ? -0.45 : 0.45)*C); g.lineTo(x + 1.05*C, y + (up ? -0.45 : 0.45)*C); g.closePath(); g.fill(); };
+  drum(-7, 17, true); drum(6, 17, false); drum(-7, -14, true); drum(7, -14, false);
+  screw(-12, 10, true); screw(12, 10, true); screw(-11, -5, true); screw(12, -5, true);
+  g.fillStyle = ink; g.font = `bold 25px ${KO}`;
+  [['가늠자돌림쇠', -7, 15.6], ['가늠자돌림쇠', 6, 15.6], ['가늠자돌림쇠', -7.5, -12.6], ['가늠자돌림쇠', 7.6, -12.6],
+   ['가늠자상하조정나사', -9.5, 8.6], ['가늠자상하조정나사', 9.6, 8.6], ['가늠자상하조정나사', -9.7, -6.6], ['가늠자상하조정나사', 9.6, -6.6],
+   ['가늠자상하조정나사 "2.5" 사용', 0.4, -11.6]].forEach(([t, c, r])=>{ g.fillStyle = '#efece3'; const w = g.measureText(t).width + 10; g.fillRect(X(c) - w/2, Y(r) - 15, w, 30); g.fillStyle = ink; g.fillText(t, X(c), Y(r)); });
+  // instructions under the grid
+  g.textAlign = 'left'; g.font = `24px ${KO}`;
+  g.fillText('○ 수직선 0을 기준 : 좌탄시 가늠자돌림쇠를 우로, 우탄시 좌로 돌려 조정', 70, Y(-15) + 70);
+  g.fillText('○ 수평선 0을 기준 : 상탄시 가늠자 상·하 조정나사를 좌로, 하탄시 우로 돌려 조정', 70, Y(-15) + 108);
+  g.textAlign = 'center';
 }
 
 // ---------- audio ----------
@@ -730,7 +849,7 @@ const S = {
   carrier:0, carrierV:0, dragging:false, extracted:false, charging:null,
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
-  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, spent:false, cycle:null, feed:null, held:false, catchUp:0,
+  bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, gasAng:0, gasPush:0, spent:false, cycle:null, feed:null, held:false, catchUp:0, flip:0, flipA:0,
   hits:0, points:0, rangeShots:0,
 };
 let msg = '', msgT = 0;
@@ -815,7 +934,7 @@ function pullTrigger(){
 }
 function releaseTrigger(){ S.trigger = false; }
 function cycleGas(){
-  S.gas = (S.gas + 1) % 4;
+  S.gas = (S.gas + 1) % 4; S.gasAng -= Math.PI/2; S.gasPush = 0.35;   // press the detent, turn a quarter
   burst({ freq:2200, q:3, vol:0.4, dur:0.03 }); tone(900, 0.12, 0.04, 'square', 0.03);
   say(`가스조절기 ${GAS[S.gas]}` + [' — 자동 장전이 안 돼요', ' — 가스 적게, 부드럽고 느리게', '', ' — 가스 많이, 더 빠르고 세게'][S.gas]);
 }
@@ -883,6 +1002,7 @@ function newMag(){
   setTimeout(()=>{ S.attached = true; S.newMag = false; setTimeout(SND.magIn, 150); renderHud(); }, 250);
   renderHud();
 }
+function toggleFlip(){ S.flip = 1 - S.flip; burst({ freq:3200, q:3, vol:0.35, dur:0.02 }); say(S.flip ? '가늠자 젖힘 — 큰 구멍 (근거리·야간)' : '가늠자 세움 — 작은 구멍 (정밀 조준)'); }
 function toggleStock(){ S.folded = !S.folded; SND.fold(); renderHud(); }
 function toggleClear(){ S.clear = !S.clear; setClear(S.clear); renderHud(); }
 function toggleBayonet(){
@@ -912,14 +1032,18 @@ function shootTarget(){
   if (Math.abs(dir.x) < 1e-4) return;
   const t = (TARGET_X - tmpA.x) / dir.x; if (t <= 0) return;
   const lp = target.worldToLocal(tmpA.clone().addScaledVector(dir, t));
-  if (Math.abs(lp.x) > TSIZE/2 || Math.abs(lp.y) > TSIZE/2){ popScore('빗나감'); return; }
-  const u = (lp.x/TSIZE + 0.5)*512, v = (0.5 - lp.y/TSIZE)*512;
+  lp.y -= ZERO_UP*TCV.CELL/TCV.H*TH;                          // zeroed rifle: aimed at the dot, the round strikes the zero point
+  if (Math.abs(lp.x) > TW/2 || Math.abs(lp.y) > TH/2){ popScore('빗나감'); return; }
+  const u = (lp.x/TW + 0.5)*TCV.W, v = (0.5 - lp.y/TH)*TCV.H;
   const g = targetCanvas.getContext('2d');
-  g.beginPath(); g.arc(u, v, 4, 0, Math.PI*2); g.fillStyle = '#4b2d12'; g.fill();
-  g.beginPath(); g.arc(u, v, 6, 0, Math.PI*2); g.strokeStyle = 'rgba(200,170,120,.8)'; g.lineWidth = 1.5; g.stroke();
+  // 5.56 hole: torn grey rim round a dark hole
+  g.fillStyle = 'rgba(90,90,90,.55)'; g.beginPath(); for (let k=0;k<10;k++){ const a = k/10*Math.PI*2, r = 9 + Math.random()*4; k ? g.lineTo(u + Math.cos(a)*r, v + Math.sin(a)*r) : g.moveTo(u + Math.cos(a)*r, v + Math.sin(a)*r); } g.closePath(); g.fill();
+  g.fillStyle = '#121212'; g.beginPath(); g.arc(u, v, 6.5, 0, Math.PI*2); g.fill();
   targetTex.needsUpdate = true;
-  const pts = Math.max(0, 10 - Math.floor(Math.hypot(u - 256, v - 256)/24));
-  S.hits++; S.points += pts; popScore(pts ? `${pts}점` : '0점');
+  // offset from the zero point in grid cells → which way to adjust (as printed on the sheet)
+  const dx = (u - TCV.X0)/TCV.CELL, dy = (TCV.Y0 - v)/TCV.CELL, inside = Math.hypot(dx, dy) <= 1.75;
+  if (inside){ S.hits++; popScore('원 안 명중'); }
+  else popScore(`${dx < 0 ? '좌' : '우'} ${Math.abs(dx).toFixed(1)} · ${dy > 0 ? '상' : '하'} ${Math.abs(dy).toFixed(1)}칸`);
 }
 const popEl = document.getElementById('pop');
 function popScore(t){ popEl.textContent = t; popEl.classList.remove('go'); void popEl.offsetWidth; popEl.classList.add('go'); renderHud(); }
@@ -964,10 +1088,10 @@ const TOUCH = matchMedia('(pointer: coarse)').matches;
 if (TOUCH) document.body.classList.add('touch');
 function setHint(){
   const h = document.getElementById('hint');
-  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · R 탄창 · B 대검 · Tab 점검';
+  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · E 가늠자 · R 탄창 · B 대검 · Tab 점검';
   else if (TOUCH) h.textContent = '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 탄창/대검/개머리판도 눌러보세요';
   else h.textContent = TOUCH ? '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 조정간/탄창/개머리판도 눌러보세요'
-                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
+                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · E 가늠자 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
 }
 
 // ---------- HUD ----------
@@ -991,7 +1115,7 @@ function renderHud(){
   else if (S.selector === 0) t = '장전 완료 · 안전 — 조정간을 돌리세요 (Q)';
   else { t = `사격 준비 완료 · ${SEL[S.selector]}`; cls = 'ok'; }
   statusEl.textContent = t; statusEl.className = cls;
-  scoreEl.textContent = `명중 ${S.hits} / ${S.rangeShots}발 · ${S.points}점`;
+  scoreEl.textContent = `영점 원 안 ${S.hits} / ${S.rangeShots}발`;
   document.querySelector('#bMag b').textContent = S.attached ? '탄창 분리' : '탄창 결합';
   document.getElementById('bMag').classList.toggle('on', !S.attached);
   document.getElementById('bStock').classList.toggle('on', S.folded);
@@ -1034,6 +1158,7 @@ cvs.addEventListener('pointerdown', e=>{
     dragX0 = rec.worldToLocal(hit.point.clone()).x; dragC0 = S.carrier;
   } else if (part === 'selector'){ active = 'ui'; cycleSelector(); }
   else if (part === 'boltcatch'){ active = 'ui'; boltCatch(); }
+  else if (part === 'rearsight'){ active = 'ui'; toggleFlip(); }
   else if (part === 'mag'){ active = 'ui'; toggleMag(); }
   else if (part === 'stock'){ active = 'ui'; toggleStock(); }
   else if (part === 'bayonet'){ active = 'ui'; toggleBayonet(); }
@@ -1098,6 +1223,7 @@ addEventListener('keydown', e=>{
     case 'KeyQ': cycleSelector(); break;
     case 'KeyF': chargeAuto(); break;
     case 'KeyC': boltCatch(); break;
+    case 'KeyE': toggleFlip(); break;
     case 'KeyR': toggleMag(); break;
     case 'KeyN': newMag(); break;
     case 'KeyV': toggleStock(); break;
@@ -1181,12 +1307,14 @@ function animate(){
   const hp = Math.max(S.hammer, THREE.MathUtils.clamp(S.carrier/0.5, 0, 1));
   parts.hammer.rotation.z = parts.HAM_FALL + hp*(parts.HAM_COCK - parts.HAM_FALL);
 
+  S.flipA += (S.flip - S.flipA) * Math.min(1, dt*14); parts.flip.rotation.z = -S.flipA*Math.PI/2;   // flips forward onto the other leaf
   const up = S.held || (S.charging && S.charging.lock && S.carrier > 0.9) ? 1 : 0;
   S.catchUp += (up - S.catchUp) * Math.min(1, dt*25);
   parts.boltCatch.position.y = S.catchUp*0.035;
   parts.trigger.rotation.z += ((S.trigger ? -0.3 : 0) - parts.trigger.rotation.z) * Math.min(1, dt*30);
   parts.selector.rotation.z += (S.selAng - parts.selector.rotation.z) * Math.min(1, dt*20);
-  const ga = parts.GAS_ANG[S.gas]; parts.gas.rotation.x += (ga - parts.gas.rotation.x) * Math.min(1, dt*16);
+  parts.gas.rotation.x += (S.gasAng - parts.gas.rotation.x) * Math.min(1, dt*12);
+  S.gasPush = Math.max(0, S.gasPush - dt); parts.gasDetent.position.z = S.gasPush > 0 ? 0.115 : 0.13;
   for (let i=0;i<4;i++) [S.fold, S.foldV] = spring(S.fold, S.foldV, S.folded ? 1 : 0, 120, 14, dt/4);
   parts.stock.rotation.y = S.fold * Math.PI;
   // bayonet: on the lug, or parked below the barrel when off (hidden on the range)
