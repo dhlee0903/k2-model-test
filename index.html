@@ -172,6 +172,7 @@
   <div class="sep"></div><div class="grp">부착</div>
   <button class="tile" id="bBay"><svg viewBox="0 0 24 24"><path d="M3 21l7-7"/><path d="M10 14l10-10-1 6-6 7z"/><path d="M7 14l3 3"/></svg><b>대검</b><kbd>B</kbd></button>
   <button class="tile" id="bStock"><svg viewBox="0 0 24 24"><path d="M3 9h9l3-3h6v10h-6l-3-3H3z"/></svg><b>개머리판</b><kbd>V</kbd></button>
+  <button class="tile" id="bSling"><svg viewBox="0 0 24 24"><path d="M3 6c4 10 14 10 18 0"/><path d="M3 4v4M21 4v4"/></svg><b>멜빵</b><kbd>M</kbd></button>
   <div class="sep"></div><div class="grp">보기</div>
   <button class="tile" id="bClear"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><b>투명</b><kbd>X</kbd></button>
   <button class="tile" id="bDis"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><b>분해</b><kbd>D</kbd></button>
@@ -381,7 +382,7 @@ function makeRound(live){
 // muzzle +x, up +y, right side +z; 1 unit ≈ 85 mm, bore line y = 0.38
 const SIGHT_Y = 0.97, TRAVEL = 1.0, BORE = 0.38;
 const gun = new THREE.Group(), rec = new THREE.Group(); gun.add(rec);
-const parts = { portCover:[] };
+const parts = { portCover:[], labels1:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
 
 (function buildRifle(){
@@ -633,12 +634,47 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(bc, cylZ(0.013, 0.03, M.steel, 12), 0.015, -0.1, -0.008);                          // roll pin
   tag(bc, 'boltcatch');
   // rear sling loop (photo): swivel block at the back of the lower on the left, big D-loop hanging from it
-  at(rec, rbox(0.12, 0.12, 0.05, 0.02, M.gun), -1.17, 0.02, LZ - 0.02);
-  at(rec, cylZ(0.02, 0.08, M.steel, 10), -1.17, 0.02, LZ - 0.04);
-  const loopS = new THREE.Shape(); loopS.moveTo(-0.1, 0); loopS.lineTo(0.1, 0); loopS.quadraticCurveTo(0.12, -0.34, 0, -0.34); loopS.quadraticCurveTo(-0.12, -0.34, -0.1, 0);
-  const loopH = new THREE.Path(); loopH.moveTo(-0.075, -0.025); loopH.lineTo(0.075, -0.025); loopH.quadraticCurveTo(0.09, -0.31, 0, -0.31); loopH.quadraticCurveTo(-0.09, -0.31, -0.075, -0.025);
+  at(rec, rbox(0.13, 0.13, 0.05, 0.02, M.gun), -1.17, 0.02, LZ - 0.02);                  // swivel boss
+  at(rec, cylZ(0.03, 0.07, M.dsteel, 14), -1.17, 0.02, LZ - 0.05); at(rec, box(0.04, 0.007, 0.004, M.black), -1.17, 0.02, LZ - 0.086).rotation.z = 0.7;   // swivel rivet
+  const loopS = new THREE.Shape(); loopS.moveTo(-0.04, 0.03); loopS.quadraticCurveTo(0, 0.06, 0.04, 0.03); loopS.lineTo(0.15, -0.17); loopS.quadraticCurveTo(0.17, -0.22, 0.12, -0.22);
+  loopS.lineTo(-0.12, -0.22); loopS.quadraticCurveTo(-0.17, -0.22, -0.15, -0.17); loopS.lineTo(-0.04, 0.03);
+  const loopH = new THREE.Path(); loopH.moveTo(-0.02, 0.0); loopH.lineTo(-0.12, -0.175); loopH.quadraticCurveTo(-0.13, -0.195, -0.11, -0.195); loopH.lineTo(0.11, -0.195);
+  loopH.quadraticCurveTo(0.13, -0.195, 0.12, -0.175); loopH.lineTo(0.02, 0.0); loopH.lineTo(-0.02, 0.0);
   loopS.holes.push(loopH);
-  const sling = extrude(loopS, 0.018, M.dsteel, 0.006); sling.position.set(-1.17, 0.02, LZ - 0.075); sling.rotation.z = -0.35; rec.add(sling);
+  const rloop = extrude(loopS, 0.016, M.dsteel, 0.006); rloop.position.set(-1.17, 0.02, LZ - 0.09); rec.add(rloop);
+  // --- sling (멜빵, 분해도 ①): olive cotton webbing between the two loops, snap hooks at both ends, a slide buckle ---
+  { const sl = new THREE.Group(); rec.add(sl); parts.sling = sl;
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
+    g.fillStyle = '#5b6638'; g.fillRect(0, 0, 64, 256);
+    for (let y=0;y<256;y+=4) for (let x=0;x<64;x+=4){ g.fillStyle = ((x + y)/4) % 2 ? 'rgba(30,36,18,.28)' : 'rgba(170,180,120,.16)'; g.fillRect(x, y, 4, 3); }   // twill weave
+    g.fillStyle = 'rgba(25,30,15,.5)'; g.fillRect(0, 0, 4, 256); g.fillRect(60, 0, 4, 256);                                     // woven edges
+    const wt = new THREE.CanvasTexture(cv); wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.encoding = THREE.sRGBEncoding;
+    const webM = new THREE.MeshStandardMaterial({ map:wt, bumpMap:wt, bumpScale:0.004, roughness:0.95, side:THREE.DoubleSide });
+    const SW = 0.24, FB = new THREE.Vector3(4.62, 0.081, 0), RB = new THREE.Vector3(-1.17, 0.02 - 0.208, LZ - 0.082);   // the loops' bottom bars
+    const path = new THREE.CatmullRomCurve3([FB.clone().add(new THREE.Vector3(0, -0.1, 0)), new THREE.Vector3(4.42, -0.42, -0.1), new THREE.Vector3(3.6, -0.95, -0.24),
+      new THREE.Vector3(2.3, -1.3, -0.38), new THREE.Vector3(0.9, -1.36, -0.44), new THREE.Vector3(-0.3, -1.06, -0.44), new THREE.Vector3(-0.98, -0.62, -0.4), RB.clone().add(new THREE.Vector3(0, -0.1, 0))]);
+    const N = 160, L = path.getLength(), pos = [], uv = [], idx = [], Z = new THREE.Vector3(0, 0, 1);
+    for (let i=0;i<=N;i++){ const u = i/N, p = path.getPointAt(u), t = path.getTangentAt(u), w = new THREE.Vector3().crossVectors(t, Z).normalize();
+      pos.push(p.x + w.x*SW/2, p.y + w.y*SW/2, p.z, p.x - w.x*SW/2, p.y - w.y*SW/2, p.z); uv.push(0, u*L/0.9, 1, u*L/0.9); }
+    for (let i=0;i<N;i++){ const a = i*2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); wg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); wg.setIndex(idx); wg.computeVertexNormals();
+    sl.add(shadowed(new THREE.Mesh(wg, webM)));
+    // snap hooks: a flat body the webbing is sewn through, and a hook closing round the loop's bottom bar
+    const hookM = new THREE.MeshStandardMaterial({ color:0x1b1c1e, roughness:0.45, metalness:0.7 });
+    [FB, RB].forEach(b=>{
+      const h = new THREE.Group(); h.position.copy(b); sl.add(h);
+      at(h, rbox(0.2, 0.07, 0.03, 0.012, hookM), 0, -0.075, 0);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.009, 8, 18, Math.PI*1.65), hookM); ring.rotation.set(0, Math.PI/2, 0.5); h.add(shadowed(ring));
+      at(h, box(0.02, 0.06, 0.012, hookM), 0.05, -0.035, 0.012);                           // the spring gate
+    });
+    // slide buckle a third of the way back (where the length is set): a flat frame round the doubled webbing
+    { const u = 0.3, p = path.getPointAt(u), t = path.getTangentAt(u);
+      const fr = new THREE.Shape(); fr.moveTo(-0.15, -0.05); fr.lineTo(0.15, -0.05); fr.lineTo(0.15, 0.05); fr.lineTo(-0.15, 0.05); fr.lineTo(-0.15, -0.05);
+      const hole = new THREE.Path(); hole.moveTo(-0.13, -0.03); hole.lineTo(-0.13, 0.03); hole.lineTo(0.13, 0.03); hole.lineTo(0.13, -0.03); hole.lineTo(-0.13, -0.03); fr.holes.push(hole);
+      const bk = extrude(fr, 0.012, hookM, 0.004); bk.position.copy(p); bk.position.z -= 0.012; bk.rotation.z = Math.atan2(t.y, t.x) + Math.PI/2; sl.add(bk);
+      at(sl, box(0.012, 0.012, 0.03, hookM), p.x, p.y, p.z).rotation.z = Math.atan2(t.y, t.x) + Math.PI/2; }
+    tag(sl, 'sling');
+    const lb = tagSprite('멜빵'); lb.position.set(1.6, -1.25, -0.5); sl.add(lb); parts.labels1.push(lb); lb.raycast = ()=>{}; }
   // left side of the upper (photo): small raised pad ahead of the port area, slotted screw on the sight housing
   tag(sel, 'selector');
   // --- hinge block + folding stock: slim wrist rising to a tall butt (folds along the right side) ---
@@ -697,7 +733,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   [1.66, 2.04, 2.42, 2.8].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.04, x1:x + 0.04, w:0.13, hole:true }));
   feats.forEach(f=>{ f.sp = secPt(f.t + 0.003).sub(secPt(f.t - 0.003)).length()/0.006; });
   const hgMat = M.poly.clone(); hgMat.vertexColors = true; hgMat.side = THREE.DoubleSide; SHELL.push([hgMat, 0.14]);
-  parts.hgHalves = []; parts.labels1 = [];
+  parts.hgHalves = [];
   [[1, Math.PI/2], [-1, -Math.PI/2]].forEach(([sd, t0])=>{                     // sd +1 = right half (z > 0), -1 = left
     const half = new THREE.Group(); half.position.z = sd*0.002; hgG.add(half);
     // main body (x 1.37…3.05): thin shell (outer + inner skin, THK apart) as a surface grid
@@ -809,7 +845,12 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   yArrow.rotation.y = Math.PI/2; yArrow.position.set(5.1515, 0.775, 0); rec.add(yArrow);
   // regulator: plug + rounded-octagon milled cap; marks engraved on the cap face round the rim, the one at the top is in use.
   // Seen from the muzzle they run clockwise 중 (top) → 소 → 0 → 대; press the checkered detent on the side to turn it.
-  const gas = new THREE.Group(); gas.position.set(5.14, 0.64, 0); rec.add(gas); parts.gas = gas;
+  // the regulator is a plug in the gas block: in a mount so field stripping can pull it out forward (분해도 ④)
+  const gasMount = new THREE.Group(); gasMount.position.set(5.14, 0.64, 0); rec.add(gasMount); parts.gasMount = gasMount;
+  const gas = new THREE.Group(); gasMount.add(gas); parts.gas = gas;
+  at(gas, cylX(0.05, 0.32, M.dsteel, 20), -0.16, 0, 0);                                 // plug stem (inside the block when fitted)
+  [-0.08, -0.2].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.004, 6, 20), M.black); r.rotation.y = Math.PI/2; at(gas, r, x, 0, 0); });   // its gas-port grooves
+  { const lb = tagSprite('가스조절기'); lb.position.set(0.1, 0.32, 0); gasMount.add(lb); parts.labels1.push(lb); }
   at(gas, cylX(0.07, 0.03, M.gunDark, 28), 0.015, 0, 0);
   const oct = new THREE.Shape(); for (let k=0;k<8;k++){ const a = k*Math.PI/4 + Math.PI/8, r = 0.098; k ? oct.lineTo(Math.cos(a)*r, Math.sin(a)*r) : oct.moveTo(Math.cos(a)*r, Math.sin(a)*r); } oct.closePath();
   const capM = extrude(oct, 0.05, M.gunDark, 0.014); capM.rotation.y = Math.PI/2; capM.position.x = 0.032; gas.add(capM);   // face at x ≈ 0.096
@@ -831,10 +872,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, cylZ(0.015, 0.1, M.steel, 10), 4.62, 0.24, 0);
   at(rec, cylZ(0.024, 0.014, M.dsteel, 16), 4.62, 0.275, 0.042); at(rec, box(0.036, 0.006, 0.004, M.black), 4.62, 0.275, 0.05).rotation.z = 0.5;   // clamp screw
   // (photo) the sling loop is a rounded trapezoid, widening downward; the band's lug carries a slotted clamp screw
-  const dring = new THREE.Shape(); dring.moveTo(-0.04, 0.0); dring.lineTo(0.04, 0.0); dring.lineTo(0.085, -0.13); dring.quadraticCurveTo(0.095, -0.17, 0.06, -0.17);
-  dring.lineTo(-0.06, -0.17); dring.quadraticCurveTo(-0.095, -0.17, -0.085, -0.13); dring.lineTo(-0.04, 0.0);
-  const dpath = new THREE.Path(); dpath.moveTo(-0.025, -0.025); dpath.lineTo(-0.06, -0.135); dpath.quadraticCurveTo(-0.065, -0.148, -0.05, -0.148);
-  dpath.lineTo(0.05, -0.148); dpath.quadraticCurveTo(0.065, -0.148, 0.06, -0.135); dpath.lineTo(0.025, -0.025); dpath.lineTo(-0.025, -0.025);
+  const dring = new THREE.Shape(); dring.moveTo(-0.07, 0.02); dring.quadraticCurveTo(0, 0.05, 0.07, 0.02); dring.lineTo(0.15, -0.13); dring.quadraticCurveTo(0.17, -0.17, 0.13, -0.17);
+  dring.lineTo(-0.13, -0.17); dring.quadraticCurveTo(-0.17, -0.17, -0.15, -0.13); dring.lineTo(-0.045, 0.02);
+  const dpath = new THREE.Path(); dpath.moveTo(-0.045, -0.012); dpath.lineTo(-0.122, -0.132); dpath.quadraticCurveTo(-0.13, -0.146, -0.112, -0.146);
+  dpath.lineTo(0.112, -0.146); dpath.quadraticCurveTo(0.13, -0.146, 0.122, -0.132); dpath.lineTo(0.045, -0.012); dpath.lineTo(-0.045, -0.012);
   dring.holes.push(dpath);
   const dr = extrude(dring, 0.02, M.dsteel, 0.006); dr.position.set(4.62, 0.24, -0.01); rec.add(dr);
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
@@ -1088,7 +1129,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // writing rifle coordinates (carrier travel, spring length, explode offsets)
   const upper = new THREE.Group(); upper.position.set(PIV[0], PIV[1], 0); parts.upper = upper;
   const inner = new THREE.Group(); inner.position.set(-PIV[0], -PIV[1], 0); upper.add(inner);
-  const keep = new Set([parts.feedRound, parts.mag, parts.stock, parts.hammer, parts.trigger, parts.selector, parts.lowerTri]);
+  const keep = new Set([parts.feedRound, parts.mag, parts.stock, parts.hammer, parts.trigger, parts.selector, parts.lowerTri, parts.sling]);
   const b3 = new THREE.Box3(), c3 = new THREE.Vector3();
   rec.updateMatrixWorld(true);        // the rifle still sits at the origin here, so world space == rifle space (for the bounding boxes)
   [...rec.children].forEach(ch=>{
@@ -1282,7 +1323,7 @@ const S = {
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
   bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, gasAng:0, gasPush:0, spent:false, cycle:null, feed:null, held:false, catchPulled:false, catchUp:0, flip:0, flipA:0, night:0, nightA:0,
-  hits:0, points:0, rangeShots:0,
+  hits:0, points:0, rangeShots:0, sling:true, slingA:1,
   // zeroing: the rifle comes with its own error (cells on the 25 m sheet); clicks move the strike by one cell each
   zx:(Math.random() < 0.5 ? -1 : 1)*(1.5 + Math.random()*3), zy:(Math.random() < 0.5 ? -1 : 1)*(1 + Math.random()*3), wind:0, elev:0, group:[],
 };
@@ -1485,6 +1526,7 @@ function toggleNight(){ S.night = 1 - S.night; burst({ freq:2800, q:3, vol:0.35,
 function toggleFlip(){ S.flip = 1 - S.flip; burst({ freq:3200, q:3, vol:0.35, dur:0.02 }); say(S.flip ? '가늠자 젖힘 — 큰 구멍 (근거리·야간)' : '가늠자 세움 — 작은 구멍 (정밀 조준)'); }
 function toggleStock(){ S.folded = !S.folded; SND.fold(); renderHud(); }
 function toggleClear(){ S.clear = !S.clear; setClear(S.clear); renderHud(); }
+function toggleSling(){ S.sling = !S.sling; SND.fold(); say(S.sling ? '멜빵 결합' : '멜빵 분리'); renderHud(); }
 function toggleBayonet(){
   S.bayonet = !S.bayonet;
   burst({ freq:5200, q:0.8, vol:0.35, dur:0.12, curve:2, type:'highpass', sweep:2500 });
@@ -1599,7 +1641,7 @@ function setHint(){
              : [['', '마우스 조준'], ['Space', '발사'], ['←→', '돌림쇠'], ['↑↓', '상하조정나사'], ['T', '표적지 교체'], ['Q', '조정간'], ['F', '노리쇠'], ['R', '탄창'], ['Tab', '점검']])
     : (TOUCH ? [['', '총을 눌러 방아쇠'], ['', '장전손잡이 뒤로 끌기'], ['', '탄창·대검·개머리판도 눌러보세요']]
              : [['', '클릭 방아쇠'], ['', '장전손잡이 드래그'], ['Q', '조정간'], ['F', '노리쇠'], ['C', '노리쇠멈치'], ['E', '가늠자'], ['Y', '야간가늠자'], ['R', '탄창'], ['N', '새 탄창'],
-                ['V', '개머리판'], ['B', '대검'], ['G', '가스'], ['D', '분해'], ['X', '투명'], ['Tab', '사격장']]);
+                ['V', '개머리판'], ['B', '대검'], ['M', '멜빵'], ['G', '가스'], ['D', '분해'], ['X', '투명'], ['Tab', '사격장']]);
   h.innerHTML = items.map(([k, t])=>`<span>${k ? `<kbd>${k}</kbd>` : ''}${t}</span>`).join('');
 }
 
@@ -1616,7 +1658,7 @@ function renderHud(){
   [...selEl.children].forEach((s, i)=>{ s.classList.toggle('on', i === S.selector); s.classList.toggle('safe', i === 0); });
   let t, cls = 'warn';
   if (msgT > 0) t = msg;
-  else if (S.disasm === 1) t = '분해 — 걸쇠 눌러 총열뭉치를 열고 덮개·복좌용수철·장전손잡이·노리쇠뭉치·가스활대 빼냄 (노리쇠뭉치 클릭/D: 더 분해)';
+  else if (S.disasm === 1) t = '분해 — 멜빵을 풀고 걸쇠 눌러 총열뭉치를 열고 덮개·가스조절기·복좌용수철·장전손잡이·노리쇠뭉치·가스활대 빼냄 (노리쇠뭉치 클릭/D: 더 분해)';
   else if (S.disasm === 2) t = '노리쇠뭉치 분해 — 노리쇠·공이·공이멈치못·노리쇠돌림못·칼퀴 (D: 조립)';
   else if (S.held) t = S.mag && S.attached && S.mag.count > 0 ? '노리쇠 후퇴고정 — 노리쇠멈치를 눌러 장전 (C)' : '노리쇠 후퇴고정 — 탄창 교체 (N) 후 노리쇠멈치 (C)';
   else if (!S.chambered && !(S.mag && S.attached)) t = '탄창이 분리돼 있어요 — 탄창 결합 (R)';
@@ -1636,6 +1678,7 @@ function renderHud(){
   document.getElementById('bCatch').classList.toggle('on', S.held);
   document.getElementById('gasChip').innerHTML = `<span class="cap">가스</span>${GAS[S.gas]}`;
   document.getElementById('bBay').classList.toggle('on', S.bayonet);
+  document.getElementById('bSling').classList.toggle('on', S.sling);
   document.querySelector('#bDis b').textContent = ['분해', '노리쇠 분해', '조립'][S.disasm];
   document.getElementById('bDis').classList.toggle('on', S.disasm > 0);
 }
@@ -1680,6 +1723,7 @@ cvs.addEventListener('pointerdown', e=>{
   else if (part === 'mag'){ active = 'ui'; toggleMag(); }
   else if (part === 'stock'){ active = 'ui'; toggleStock(); }
   else if (part === 'bayonet'){ active = 'ui'; toggleBayonet(); }
+  else if (part === 'sling'){ active = 'ui'; toggleSling(); }
   else if (part === 'gas'){ active = 'ui'; cycleGas(); }
   else { active = 'trigger'; pullTrigger(); }
 });
@@ -1729,6 +1773,7 @@ document.getElementById('bStock').onclick = ()=>{ ac(); toggleStock(); };
 document.getElementById('bClear').onclick = toggleClear;
 document.getElementById('gasChip').onclick = ()=>{ ac(); cycleGas(); };
 document.getElementById('bBay').onclick = ()=>{ ac(); toggleBayonet(); };
+document.getElementById('bSling').onclick = ()=>{ ac(); toggleSling(); };
 document.getElementById('bDis').onclick = ()=>{ ac(); toggleDisasm(); };
 document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick = ()=>setView(b.dataset.v));
 document.querySelectorAll('#zeroCard [data-z]').forEach(b=>b.onclick = ()=>{ ac(); const [a, d] = b.dataset.z.split(','); zeroClick(a, +d); });
@@ -1750,6 +1795,7 @@ addEventListener('keydown', e=>{
     case 'KeyV': toggleStock(); break;
     case 'KeyX': toggleClear(); break;
     case 'KeyB': toggleBayonet(); break;
+    case 'KeyM': toggleSling(); break;
     case 'KeyG': cycleGas(); break;
     case 'KeyD': toggleDisasm(); break;
     case 'ArrowRight': e.preventDefault(); zeroClick('w', 1); break;
@@ -1876,6 +1922,13 @@ function animate(){
   const level = -tilt;
   parts.carrier.rotation.z = level*stepK(0.86, 1);
   parts.hgHalves.forEach(h=>{ h.g.position.set(0, 0, h.sd*0.002); applySteps(h.g.position, h.steps); });
+  // sling (①): unhooked first and laid out flat on the left; with the sling taken off (M) it is simply away
+  { S.slingA += ((S.sling ? 1 : 0) - S.slingA) * Math.min(1, dt*8);
+    const k = stepK(0.0, 0.22), sl = parts.sling, off = 1 - S.slingA;
+    sl.visible = S.slingA > 0.02;
+    sl.rotation.x = k*Math.PI/2; sl.position.set(0, -1.75*k - off*2.5, -1.15*k - off*1.5); }
+  // gas regulator (④): pulled out of the gas block forward, then laid beside the barrel
+  { const gm = parts.gasMount; gm.position.set(5.14, 0.64, 0); applySteps(gm.position, [[0.3, 0.42, [0.5, 0, 0]], [0.42, 0.62, [0.3, -0.35, 0.95]]]); }
   parts.labels1.forEach(lb=>lb.material.opacity = shown*(1 - ease2));          // big-assembly names give way to the carrier parts in stage 2
   parts.explode.forEach(p=>{ if (p.stage === 1 && p.g.parent !== parts.carrier) p.g.rotation.z = level*stepK(p.g === parts.recoilSpring.parent ? 0.5 : 0.6, p.g === parts.recoilSpring.parent ? 0.62 : 0.7); });
   controls.target.y += ((S.disasm ? 0.8 : -0.2) - controls.target.y) * Math.min(1, dt*4);
