@@ -8,117 +8,158 @@
 <title>K2 소총 시뮬레이터</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
-  :root { --bg1:#ffffff; --bg2:#e7eaef; --fg:#1d2430; --muted:#5b6575; --chip:#ffffffde; --on:#1d2430; --on-fg:#fff; --warn:#c2410c; --ok:#15803d; --fire:#b91c1c; }
-  * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  :root { --bg1:#ffffff; --bg2:#e4e8ee; --fg:#141a24; --muted:#5d6878; --line:rgba(20,30,50,.08);
+          --chip:rgba(255,255,255,.78); --chip-solid:#fff; --hover:rgba(20,30,50,.06); --on:#151b26; --on-fg:#fff;
+          --warn:#c2410c; --ok:#15803d; --fire:#c81e1e; --fire2:#8f1212; --accent:#2563eb;
+          --shadow:0 1px 2px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.10); --r:16px; }
+  body.range { --chip:rgba(17,22,30,.62); --chip-solid:#11161e; --fg:#eef2f7; --muted:#a8b3c2; --line:rgba(255,255,255,.10); --hover:rgba(255,255,255,.08);
+               --on:#eef2f7; --on-fg:#111827; --warn:#fdba74; --ok:#86efac; --shadow:0 6px 24px rgba(0,0,0,.35); }
+  * { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
   html, body, button { touch-action:manipulation; }
   html, body { margin:0; height:100%; overflow:hidden; background:#fff; color-scheme:light; }
-  body { background: radial-gradient(ellipse at 50% 35%, var(--bg1), var(--bg2)); color:var(--fg);
-         font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  body { background: radial-gradient(ellipse at 50% 30%, var(--bg1), var(--bg2) 75%); color:var(--fg);
+         font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; letter-spacing:-.01em; }
   body.range { background: linear-gradient(#8dbde6, #dcecf8 60%, #eef4f8); }
   canvas { display:block; touch-action:none; }
+  .glass { background:var(--chip); border:1px solid var(--line); box-shadow:var(--shadow); -webkit-backdrop-filter:blur(14px) saturate(1.4); backdrop-filter:blur(14px) saturate(1.4); }
+  kbd { font:600 10px ui-monospace, "SF Mono", Consolas, monospace; color:var(--muted); background:var(--chip-solid); border:1px solid var(--line);
+        border-bottom-width:2px; border-radius:5px; padding:0 5px; line-height:15px; display:inline-block; min-width:16px; text-align:center; }
   #hud { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; pointer-events:none; }
-  #ammo { font-size:44px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
-  #ammo small { font-size:22px; color:var(--muted); font-weight:700; }
-  #ammoLbl { font-size:12px; color:var(--muted); margin-top:6px; letter-spacing:.03em; }
+  /* ammo card (top left) */
+  #ammoCard { padding:10px 14px 11px; border-radius:var(--r); min-width:150px; }
+  #ammoCard .cap { font-size:10.5px; font-weight:800; letter-spacing:.14em; color:var(--muted); text-transform:uppercase; }
+  #ammo { font-size:40px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; margin-top:4px; letter-spacing:-.03em; }
+  #ammo small { font-size:20px; color:var(--muted); font-weight:700; letter-spacing:0; }
+  #ammoBar { margin-top:8px; height:6px; border-radius:6px; background:var(--hover); overflow:hidden; }
+  #ammoBar i { display:block; height:100%; width:100%; border-radius:6px; background:linear-gradient(90deg, #c08a2e, #e3b45a); transition:width .18s ease; }
+  #ammoBar.low i { background:linear-gradient(90deg, #b91c1c, #ef4444); }
+  #ammoLbl { font-size:12px; color:var(--muted); margin-top:7px; font-weight:600; }
   /* status guide: top centre under the view switch */
-  #status { position:fixed; top:calc(68px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); max-width:min(640px, calc(100vw - 340px));
-            padding:9px 20px 9px 16px; border-radius:16px; background:var(--chip); box-shadow:0 2px 12px rgba(20,30,50,.14); backdrop-filter:blur(10px);
-            font-size:17px; font-weight:650; letter-spacing:-.01em; line-height:1.35; text-align:center; pointer-events:none; text-wrap:balance; }
+  #status { position:fixed; top:calc(70px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); max-width:min(640px, calc(100vw - 380px));
+            padding:10px 20px 10px 16px; border-radius:var(--r); font-size:17px; font-weight:650; line-height:1.38; text-align:center; pointer-events:none; text-wrap:balance; }
   #status:empty { display:none; }
-  #status::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; margin:0 9px 2px 0; vertical-align:middle; background:currentColor; }
+  #status::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; margin:0 10px 2px 0; vertical-align:middle; background:currentColor;
+                    box-shadow:0 0 0 4px color-mix(in srgb, currentColor 18%, transparent); }
   #status.warn { color:var(--warn); } #status.ok { color:var(--ok); }
+  #status.pulse { animation:pulse .35s ease-out; }
+  @keyframes pulse { from { opacity:.3; transform:translate(-50%, -4px); } to { opacity:1; transform:translate(-50%, 0); } }
+  /* selector / gas / score (top right) */
   #right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
-  #sel { display:flex; gap:3px; background:var(--chip); padding:4px; border-radius:999px; box-shadow:0 1px 4px rgba(20,30,50,.14); pointer-events:auto; cursor:pointer; }
-  #sel span { padding:6px 11px; border-radius:999px; font-size:13px; font-weight:800; color:var(--muted); white-space:nowrap; }
+  #selCard { padding:6px 6px 6px 12px; border-radius:999px; display:flex; align-items:center; gap:8px; pointer-events:auto; }
+  #selCard .cap, #gasChip .cap { font-size:10.5px; font-weight:800; color:var(--muted); letter-spacing:.08em; }
+  #sel { display:flex; gap:2px; cursor:pointer; }
+  #sel span { padding:6px 12px; border-radius:999px; font-size:13px; font-weight:750; color:var(--muted); white-space:nowrap; transition:background .15s, color .15s; }
+  #sel span:hover { background:var(--hover); }
   #sel span.on { background:var(--on); color:var(--on-fg); }
-  #sel span.on.safe { background:var(--ok); }
-  #score { font-size:13px; font-weight:700; text-align:right; background:var(--chip); padding:6px 12px; border-radius:12px; box-shadow:0 1px 4px rgba(20,30,50,.14); }
+  #sel span.on.safe { background:var(--ok); color:#fff; }
+  body.range #sel span.on.safe { color:#052e16; }
+  #score { font-size:13px; font-weight:750; text-align:right; padding:7px 13px; border-radius:12px; }
   #score[hidden] { display:none; }
-  .chip { pointer-events:auto; cursor:pointer; font-size:12px; font-weight:800; background:var(--chip); padding:6px 12px; border-radius:999px; box-shadow:0 1px 4px rgba(20,30,50,.14); }
-  #peep { position:fixed; inset:0; pointer-events:none; display:none;
+  .chip { pointer-events:auto; cursor:pointer; font-size:12.5px; font-weight:750; padding:7px 13px; border-radius:999px; display:flex; gap:7px; align-items:center; }
+  .chip:hover { filter:brightness(.98); }
+  #hud, #status, #viewSeg, #dock, #fire, #hint, #pop { z-index:2; }
+  #peep { position:fixed; inset:0; pointer-events:none; display:none; z-index:1;
           background: radial-gradient(circle at 50% 50%, transparent 0, transparent 21vmin, rgba(18,20,24,.55) 25vmin, rgba(12,13,16,.94) 31vmin); }
   body.range #peep { display:block; }
   #pop { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.45); opacity:0; pointer-events:none; }
   #pop.go { animation:pop .8s ease-out; }
   @keyframes pop { 0% { opacity:1; transform:translate(-50%,-30%) scale(1.2); } 70% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-90%) scale(1); } }
   /* view switch (top centre) */
-  #viewSeg { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:2px; padding:4px;
-             background:var(--chip); border-radius:999px; box-shadow:0 1px 6px rgba(20,30,50,.16); backdrop-filter:blur(10px); }
-  #viewSeg button { border:0; background:transparent; font:inherit; font-size:13px; font-weight:800; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+  #viewSeg { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:2px; padding:4px; border-radius:999px; }
+  #viewSeg button { border:0; background:transparent; font:inherit; font-size:13.5px; font-weight:750; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer; white-space:nowrap;
+                    display:flex; gap:6px; align-items:center; transition:background .15s, color .15s; }
+  #viewSeg button:hover { background:var(--hover); }
   #viewSeg button.on { background:var(--on); color:var(--on-fg); }
+  #viewSeg svg, .tile svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:0 0 auto; }
+  #viewSeg svg { width:16px; height:16px; }
   /* tool dock (right edge): action / attachments / view */
-  #dock { position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:4px; padding:8px;
-          background:var(--chip); border-radius:18px; box-shadow:0 2px 12px rgba(20,30,50,.16); backdrop-filter:blur(10px);
-          max-height:calc(100vh - 250px); overflow-y:auto; scrollbar-width:none; }
+  #dock { position:fixed; right:14px; top:50%; transform:translateY(-50%); display:grid; grid-template-columns:repeat(2, 66px); gap:3px; padding:8px;
+          border-radius:20px; max-height:calc(100vh - 230px); overflow-y:auto; scrollbar-width:none; }
   #dock::-webkit-scrollbar { display:none; }
-  #dock .grp { font-size:10px; font-weight:800; color:var(--muted); text-align:center; letter-spacing:.06em; margin:4px 0 1px; }
-  #dock .grp:first-child { margin-top:0; }
-  .tile { width:68px; min-height:50px; border:0; border-radius:12px; background:transparent; cursor:pointer; font:inherit; color:var(--fg);
-          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:4px 2px; }
-  .tile b { font-size:12px; font-weight:800; line-height:1.15; text-align:center; }
-  .tile kbd { font:600 10px ui-monospace, Consolas, monospace; color:var(--muted); border:1px solid #d5d9e0; border-radius:4px; padding:0 4px; }
-  .tile:hover { background:#eef1f5; }
+  #dock .grp, #dock .sep { grid-column:1 / -1; }
+  #dock .grp { font-size:9.5px; font-weight:800; color:var(--muted); text-align:center; letter-spacing:.12em; margin:4px 0 1px; }
+  #dock .grp:first-child { margin-top:2px; }
+  #dock .sep { height:1px; background:var(--line); margin:4px 6px 0; }
+  .tile { position:relative; width:66px; min-height:54px; border:0; border-radius:13px; background:transparent; cursor:pointer; font:inherit; color:var(--fg);
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:7px 2px 6px; transition:background .15s, color .15s, transform .08s; }
+  .tile b { font-size:11.5px; font-weight:750; line-height:1.15; text-align:center; }
+  .tile kbd { position:absolute; top:4px; right:4px; font-size:8.5px; line-height:11px; min-width:13px; padding:0 3px; border-bottom-width:1px; opacity:.85; }
+  .tile:hover { background:var(--hover); }
+  .tile:active { transform:scale(.96); }
   .tile.on { background:var(--on); color:var(--on-fg); }
-  .tile.on kbd { color:#cbd5e1; border-color:#475569; }
+  .tile.on kbd { color:var(--on-fg); background:transparent; border-color:rgba(255,255,255,.35); }
+  body.range .tile.on kbd { border-color:rgba(0,0,0,.25); }
   /* fire button (bottom right) */
-  #fire { position:fixed; right:22px; bottom:calc(24px + env(safe-area-inset-bottom)); width:86px; height:86px; border-radius:50%; border:0;
-          background:var(--fire); color:#fff; font:inherit; font-size:17px; font-weight:900; cursor:pointer;
-          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; box-shadow:0 6px 18px rgba(185,28,28,.35); }
-  #fire kbd { font:600 10px ui-monospace, Consolas, monospace; opacity:.8; }
-  #fire:active { transform:scale(.94); }
-  #hint { position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:130px; right:130px; text-align:center; font-size:12px; color:var(--muted); pointer-events:none; }
-  body.range #hint, body.range #ammoLbl { color:#334155; }
+  #fire { position:fixed; right:22px; bottom:calc(24px + env(safe-area-inset-bottom)); width:88px; height:88px; border-radius:50%; border:0;
+          background:radial-gradient(circle at 35% 30%, #ef4444, var(--fire) 55%, var(--fire2)); color:#fff; font:inherit; font-size:17px; font-weight:850; cursor:pointer;
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+          box-shadow:0 0 0 5px rgba(255,255,255,.55), 0 10px 26px rgba(185,28,28,.42); transition:transform .08s; }
+  body.range #fire { box-shadow:0 0 0 5px rgba(0,0,0,.25), 0 10px 26px rgba(0,0,0,.45); }
+  #fire kbd { color:#fff; background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.3); }
+  #fire:active { transform:scale(.93); }
+  /* key guide (bottom) */
+  #hint { position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); max-width:calc(100vw - 300px);
+          display:flex; flex-wrap:wrap; justify-content:center; gap:4px 12px; padding:8px 14px; border-radius:14px; font-size:12px; color:var(--muted); pointer-events:none; font-weight:600; }
+  #hint span { white-space:nowrap; display:inline-flex; gap:5px; align-items:center; }
+  #hint:empty { display:none; }
   body.touch kbd { display:none; }
+  body.touch #hint span kbd { display:inline-block; }
   @media (max-width: 640px) {
-    #hud { left:12px; right:12px; }
-    #ammo { font-size:34px; } #ammo small { font-size:17px; }
-    #status { top:calc(92px + env(safe-area-inset-top)); max-width:calc(100vw - 24px); font-size:15px; padding:7px 14px 7px 12px; }
+    #hud { left:10px; right:10px; }
+    #ammoCard { padding:8px 11px 9px; min-width:118px; }
+    #ammo { font-size:30px; } #ammo small { font-size:15px; }
+    #ammoLbl { font-size:11px; }
+    #status { top:calc(118px + env(safe-area-inset-top)); max-width:calc(100vw - 20px); font-size:14.5px; padding:8px 14px 8px 12px; }
+    #selCard { padding:4px 4px 4px 9px; gap:4px; } #selCard .cap { display:none; }
     #sel span { padding:5px 8px; font-size:12px; }
-    #viewSeg { top:auto; bottom:calc(20px + env(safe-area-inset-bottom)); left:12px; transform:none; }
+    #viewSeg { top:auto; bottom:calc(20px + env(safe-area-inset-bottom)); left:10px; transform:none; }
     #viewSeg button { padding:9px 12px; }
     /* phones: the dock becomes a swipeable row above the view switch, clear of the rifle */
-    #dock { top:auto; transform:none; left:8px; right:100px; bottom:calc(76px + env(safe-area-inset-bottom)); flex-direction:row; align-items:center;
-            max-height:none; overflow-x:auto; overflow-y:hidden; padding:5px; border-radius:16px; }
-    #dock .grp { display:none; }
-    .tile { width:auto; min-width:58px; min-height:42px; flex:0 0 auto; padding:4px 8px; }
-    .tile b { font-size:12px; white-space:nowrap; }
+    #dock { top:auto; transform:none; left:8px; right:104px; bottom:calc(78px + env(safe-area-inset-bottom)); display:flex; flex-direction:row; align-items:center;
+            max-height:none; overflow-x:auto; overflow-y:hidden; padding:5px; border-radius:18px; }
+    #dock .grp, #dock .sep { display:none; }
+    .tile { width:auto; min-width:62px; min-height:52px; flex:0 0 auto; padding:5px 9px; }
+    .tile kbd { display:none; }
+    .tile b { font-size:11.5px; white-space:nowrap; }
     .tile b br { display:none; }
-    #fire { width:78px; height:78px; right:12px; bottom:calc(20px + env(safe-area-inset-bottom)); }
+    #fire { width:80px; height:80px; right:12px; bottom:calc(20px + env(safe-area-inset-bottom)); }
     #hint { display:none; }
   }
 </style>
 </head>
 <body>
 <div id="hud">
-  <div>
+  <div id="ammoCard" class="glass">
+    <div class="cap">K2 · 5.56mm</div>
     <div id="ammo">30<small> + 0</small></div>
+    <div id="ammoBar"><i></i></div>
     <div id="ammoLbl">탄창 + 약실</div>
   </div>
   <div id="right">
-    <div id="sel" title="조정간 (Q)"><span>안전</span><span>단발</span><span>연발</span><span>점사</span></div>
-    <div id="gasChip" class="chip" title="가스조절기 (G)"></div>
-    <div id="score" hidden></div>
+    <div id="selCard" class="glass" title="조정간 (Q)"><span class="cap">조정간</span><div id="sel"><span>안전</span><span>단발</span><span>연발</span><span>점사</span></div></div>
+    <div id="gasChip" class="chip glass" title="가스조절기 (G)"></div>
+    <div id="score" class="glass" hidden></div>
   </div>
 </div>
-<div id="status"></div>
+<div id="status" class="glass"></div>
 <div id="peep"></div>
 <div id="pop"></div>
-<div id="viewSeg"><button data-v="inspect" class="on">🔍 점검</button><button data-v="range">🎯 사격장</button></div>
-<div id="dock">
+<div id="viewSeg" class="glass"><button data-v="inspect" class="on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>점검</button><button data-v="range"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>사격장</button></div>
+<div id="dock" class="glass">
   <div class="grp">조작</div>
-  <button class="tile" id="bCharge"><b>노리쇠</b><kbd>F</kbd></button>
-  <button class="tile" id="bCatch"><b>노리쇠<br>멈치</b><kbd>C</kbd></button>
-  <button class="tile" id="bMag"><b>탄창 분리</b><kbd>R</kbd></button>
-  <button class="tile" id="bNew"><b>새 탄창</b><kbd>N</kbd></button>
-  <div class="grp">부착</div>
-  <button class="tile" id="bBay"><b>대검</b><kbd>B</kbd></button>
-  <button class="tile" id="bStock"><b>개머리판<br>접기</b><kbd>V</kbd></button>
-  <div class="grp">보기</div>
-  <button class="tile" id="bClear"><b>투명</b><kbd>X</kbd></button>
-  <button class="tile" id="bDis"><b>분해</b><kbd>D</kbd></button>
+  <button class="tile" id="bCharge"><svg viewBox="0 0 24 24"><path d="M4 12h11"/><path d="M11 8l4 4-4 4"/><path d="M19 6v12"/></svg><b>노리쇠</b><kbd>F</kbd></button>
+  <button class="tile" id="bCatch"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="7" rx="3"/><path d="M12 10v11"/><path d="M9 21h6"/></svg><b>노리쇠멈치</b><kbd>C</kbd></button>
+  <button class="tile" id="bMag"><svg viewBox="0 0 24 24"><path d="M8 3h8l1 8-1.5 10h-6L8 11z"/><path d="M9 7h6"/></svg><b>탄창 분리</b><kbd>R</kbd></button>
+  <button class="tile" id="bNew"><svg viewBox="0 0 24 24"><path d="M7 3h7l1 7-1.5 10h-5L7 10z"/><path d="M19 4v6M16 7h6"/></svg><b>새 탄창</b><kbd>N</kbd></button>
+  <div class="sep"></div><div class="grp">부착</div>
+  <button class="tile" id="bBay"><svg viewBox="0 0 24 24"><path d="M3 21l7-7"/><path d="M10 14l10-10-1 6-6 7z"/><path d="M7 14l3 3"/></svg><b>대검</b><kbd>B</kbd></button>
+  <button class="tile" id="bStock"><svg viewBox="0 0 24 24"><path d="M3 9h9l3-3h6v10h-6l-3-3H3z"/></svg><b>개머리판</b><kbd>V</kbd></button>
+  <div class="sep"></div><div class="grp">보기</div>
+  <button class="tile" id="bClear"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><b>투명</b><kbd>X</kbd></button>
+  <button class="tile" id="bDis"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><b>분해</b><kbd>D</kbd></button>
 </div>
 <button id="fire"><span>발사</span><kbd>Space</kbd></button>
-<div id="hint"></div>
+<div id="hint" class="glass"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -273,7 +314,7 @@ function tagSprite(txt){
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
   const g = cv.getContext('2d');
   g.fillStyle = 'rgba(29,36,48,.88)'; g.beginPath(); g.roundRect ? g.roundRect(4, 8, 248, 48, 24) : g.rect(4, 8, 248, 48); g.fill();
-  g.fillStyle = '#fff'; g.font = 'bold 30px "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128, 34);
+  g.fillStyle = '#fff'; g.font = '700 30px "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128, 34);
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, transparent:true, depthTest:false, opacity:0 }));
   sp.scale.set(1.0, 0.25, 1); sp.renderOrder = 10; sp.userData.label = true;
@@ -552,8 +593,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const roll = engraved(g=>{
     g.font = 'bold 40px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText('소총 5.56MM K2', 20, 46); g.font = 'bold 32px "Malgun Gothic", sans-serif'; g.fillText('대우정밀', 20, 100);
-  }, 512, 128, 0.6, 0.15, true);
-  roll.position.set(0.82, -0.05, LZ - 0.0015); rec.add(roll); parts.portCover.push(roll);
+    g.font = 'bold 26px "Malgun Gothic", sans-serif'; g.fillText('제조번호  K 1 0 7 3 9 4', 20, 140);   // serial line under the maker
+  }, 512, 160, 0.5, 0.156, true);
+  roll.position.set(0.8, -0.02, -0.2735); rec.add(roll); parts.portCover.push(roll);   // on the raised magwell panel (it used to sit under it, hidden)
   // bolt catch (노리쇠멈치, photos): left side just behind the magwell, ribbed paddle on top of a long lever, no lower
   // button (K2 differs from the AR here: you lock the bolt back by pulling the paddle UP, and press it DOWN to release)
   const bc = new THREE.Group(); bc.position.set(0.06, 0.0, LZ - 0.012); rec.add(bc); parts.boltCatch = bc; parts.BC_BASE = bc.position.clone();
@@ -679,7 +721,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     const collar = extrude(halfSection(0.265, 0.29, t0), 0.45, M.poly, 0.012); collar.rotation.y = Math.PI/2; collar.position.set(3.17, HGY, 0); half.add(collar);   // x 3.17…3.62
     // screw through the collar on this side
     at(half, cylZ(0.035, 0.02, M.dsteel, 16), 3.42, HGY + 0.02, sd*0.272);
-    at(half, box(0.05, 0.008, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283); at(half, box(0.008, 0.05, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283);
+    at(half, box(0.056, 0.009, 0.006, M.black), 3.42, HGY + 0.02, sd*0.283).rotation.z = 0.4;      // single slot (photo: 덮개나사)
     if (sd > 0){ at(half, cylY(0.03, 0.02, M.dsteel, 16), 3.5, HGY + 0.295, 0); at(half, box(0.045, 0.006, 0.008, M.black), 3.5, HGY + 0.306, 0); }   // screw on top of the collar
     { const lb = tagSprite('덮개'); lb.position.set(2.2, HGY + 0.48, sd*0.3); half.add(lb); parts.labels1.push(lb); }
     if (sd > 0){ const lb = tagSprite('덮개나사'); lb.position.set(3.45, HGY + 0.55, 0.32); half.add(lb); parts.labels1.push(lb); }
@@ -743,8 +785,12 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.081,-0.04],[0.1,-0.04],[0.1,0.04],[0.081,0.04],[0.081,-0.04]].map(([r, y])=>new THREE.Vector2(r, y)), 24), M.gunDark)), 4.62, BORE, 0).rotation.z = Math.PI/2;   // band round the barrel
   at(rec, rbox(0.08, 0.08, 0.07, 0.015, M.gunDark), 4.62, 0.26, 0);
   at(rec, cylZ(0.015, 0.1, M.steel, 10), 4.62, 0.24, 0);
-  const dring = new THREE.Shape(); dring.moveTo(-0.07, 0.0); dring.lineTo(0.07, 0.0); dring.quadraticCurveTo(0.07, -0.16, 0, -0.16); dring.quadraticCurveTo(-0.07, -0.16, -0.07, 0.0);
-  const dpath = new THREE.Path(); dpath.moveTo(-0.045, -0.02); dpath.lineTo(0.045, -0.02); dpath.quadraticCurveTo(0.045, -0.135, 0, -0.135); dpath.quadraticCurveTo(-0.045, -0.135, -0.045, -0.02);
+  at(rec, cylZ(0.024, 0.014, M.dsteel, 16), 4.62, 0.275, 0.042); at(rec, box(0.036, 0.006, 0.004, M.black), 4.62, 0.275, 0.05).rotation.z = 0.5;   // clamp screw
+  // (photo) the sling loop is a rounded trapezoid, widening downward; the band's lug carries a slotted clamp screw
+  const dring = new THREE.Shape(); dring.moveTo(-0.04, 0.0); dring.lineTo(0.04, 0.0); dring.lineTo(0.085, -0.13); dring.quadraticCurveTo(0.095, -0.17, 0.06, -0.17);
+  dring.lineTo(-0.06, -0.17); dring.quadraticCurveTo(-0.095, -0.17, -0.085, -0.13); dring.lineTo(-0.04, 0.0);
+  const dpath = new THREE.Path(); dpath.moveTo(-0.025, -0.025); dpath.lineTo(-0.06, -0.135); dpath.quadraticCurveTo(-0.065, -0.148, -0.05, -0.148);
+  dpath.lineTo(0.05, -0.148); dpath.quadraticCurveTo(0.065, -0.148, 0.06, -0.135); dpath.lineTo(0.025, -0.025); dpath.lineTo(-0.025, -0.025);
   dring.holes.push(dpath);
   const dr = extrude(dring, 0.02, M.dsteel, 0.006); dr.position.set(4.62, 0.24, -0.01); rec.add(dr);
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
@@ -1476,10 +1522,13 @@ const TOUCH = matchMedia('(pointer: coarse)').matches;
 if (TOUCH) document.body.classList.add('touch');
 function setHint(){
   const h = document.getElementById('hint');
-  if (view === 'range') h.textContent = TOUCH ? '드래그로 조준 · 빨간 버튼 발사' : '마우스로 조준 · 클릭/Space 발사 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · E 가늠자 · Y 야간가늠자 · R 탄창 · B 대검 · Tab 점검';
-  else if (TOUCH) h.textContent = '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 탄창/대검/개머리판도 눌러보세요';
-  else h.textContent = TOUCH ? '총을 눌러 방아쇠 · 장전손잡이를 뒤로 끌기 · 조정간/탄창/개머리판도 눌러보세요'
-                             : '클릭=방아쇠 · 장전손잡이 드래그 · Q 조정간 · F 노리쇠 · C 노리쇠멈치 · E 가늠자 · Y 야간가늠자 · R 탄창 · N 새 탄창 · V 개머리판 · B 대검 · G 가스 · D 분해 · X 투명 · Tab 사격장';
+  const items = view === 'range'
+    ? (TOUCH ? [['', '드래그로 조준'], ['', '빨간 버튼 발사']]
+             : [['', '마우스 조준'], ['Space', '발사'], ['Q', '조정간'], ['F', '노리쇠'], ['C', '노리쇠멈치'], ['E', '가늠자'], ['Y', '야간가늠자'], ['R', '탄창'], ['B', '대검'], ['Tab', '점검']])
+    : (TOUCH ? [['', '총을 눌러 방아쇠'], ['', '장전손잡이 뒤로 끌기'], ['', '탄창·대검·개머리판도 눌러보세요']]
+             : [['', '클릭 방아쇠'], ['', '장전손잡이 드래그'], ['Q', '조정간'], ['F', '노리쇠'], ['C', '노리쇠멈치'], ['E', '가늠자'], ['Y', '야간가늠자'], ['R', '탄창'], ['N', '새 탄창'],
+                ['V', '개머리판'], ['B', '대검'], ['G', '가스'], ['D', '분해'], ['X', '투명'], ['Tab', '사격장']]);
+  h.innerHTML = items.map(([k, t])=>`<span>${k ? `<kbd>${k}</kbd>` : ''}${t}</span>`).join('');
 }
 
 // ---------- HUD ----------
@@ -1490,6 +1539,8 @@ function renderHud(){
   ammoEl.lastChild.textContent = ` + ${S.chambered ? 1 : 0}`;
   const side = S.mag && S.mag.count > 0 ? ` · ${S.mag.count % 2 === 0 ? '우' : '좌'}상탄` : '';
   ammoLbl.textContent = (S.mag && !S.attached ? `탄창 분리됨 (${S.mag.count}발) + 약실` : '탄창 + 약실') + side;
+  const cnt = S.mag && S.attached ? S.mag.count : 0, bar = document.getElementById('ammoBar');
+  bar.firstChild.style.width = (cnt/30*100) + '%'; bar.classList.toggle('low', cnt <= 5);
   [...selEl.children].forEach((s, i)=>{ s.classList.toggle('on', i === S.selector); s.classList.toggle('safe', i === 0); });
   let t, cls = 'warn';
   if (msgT > 0) t = msg;
@@ -1502,14 +1553,15 @@ function renderHud(){
   else if (!S.chambered) t = '탄이 떨어졌어요 — 새 탄창 (N)';
   else if (S.selector === 0) t = '장전 완료 · 안전 — 조정간을 돌리세요 (Q)';
   else { t = `사격 준비 완료 · ${SEL[S.selector]}`; cls = 'ok'; }
-  statusEl.textContent = t; statusEl.className = cls;
+  if (statusEl.textContent !== t){ statusEl.textContent = t; statusEl.classList.remove('pulse'); void statusEl.offsetWidth; statusEl.classList.add('pulse'); }
+  statusEl.classList.toggle('warn', cls === 'warn'); statusEl.classList.toggle('ok', cls === 'ok');
   scoreEl.textContent = `영점 원 안 ${S.hits} / ${S.rangeShots}발`;
   document.querySelector('#bMag b').textContent = S.attached ? '탄창 분리' : '탄창 결합';
   document.getElementById('bMag').classList.toggle('on', !S.attached);
   document.getElementById('bStock').classList.toggle('on', S.folded);
   document.getElementById('bClear').classList.toggle('on', S.clear);
   document.getElementById('bCatch').classList.toggle('on', S.held);
-  document.getElementById('gasChip').textContent = `가스 ${GAS[S.gas]}`;
+  document.getElementById('gasChip').innerHTML = `<span class="cap">가스</span>${GAS[S.gas]}`;
   document.getElementById('bBay').classList.toggle('on', S.bayonet);
   document.querySelector('#bDis b').textContent = ['분해', '노리쇠 분해', '조립'][S.disasm];
   document.getElementById('bDis').classList.toggle('on', S.disasm > 0);
