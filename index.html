@@ -403,7 +403,7 @@ function makeRound(live){
 
 // ---------- rifle: dimensions taken from a side photo of the K2 ----------
 // muzzle +x, up +y, right side +z; 1 unit ≈ 85 mm, bore line y = 0.38
-const SIGHT_Y = 0.97, TRAVEL = 1.25, BORE = 0.38;
+const SIGHT_Y = 0.97, TRAVEL = 1.32, BORE = 0.38;
 const gun = new THREE.Group(), rec = new THREE.Group(); gun.add(rec);
 const parts = { portCover:[], labels1:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
@@ -444,7 +444,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // edge vertices can be snapped onto the outline (smooth rounded edges, no stair-steps).
   const sdRR = (x, y, x0, x1, y0, y1, r)=>{ const qx = Math.abs(x - (x0 + x1)/2) - ((x1 - x0)/2 - r), qy = Math.abs(y - (y0 + y1)/2) - ((y1 - y0)/2 - r);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
-  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.48, 1.06, 0.32, 0.5, 0.045), sdRR(x, y, -0.84, -0.4, 0.365, 0.415, 0.02), sdRR(x, y, -0.86, -0.72, 0.34, 0.44, 0.045));   // (photo) port, slot, keyhole
+  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.18, 1.1, 0.33, 0.51, 0.045), sdRR(x, y, -0.86, -0.1, 0.295, 0.415, 0.02));   // (photos) port, slot under it
   const inPort = (x, y)=>sdPort(x, y) < 0;
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
@@ -1039,11 +1039,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rod, cylX(0.035, 0.9, M.oprod, 16), 2.35, 0, 0);
   at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
   [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
-  // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
-  // charging handle (photos): knob on a short round stem fixed to the carrier. Placed from the held-open photo: with the
-  // carrier fully back (travel 1.0) the knob sits at x -0.25, in the thin slot a little behind the port - so x 0.75 home
-  const handle = piece('장전손잡이', 0.64, 0.39, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
-  at(handle, cylZ(0.03, 0.34, M.gunDark, 20), 0, 0, -0.05);                            // round stem from the carrier straight into the knob (no gap)
+  // charging handle (photos, bolt forward + held open): a flat slide plate running in the slot under the port, the spool
+  // knob on its rear half and a "ㄱ" step on its front end that shows in the port when the bolt is back. Measured from the
+  // photos against the drum (x -0.85) and the front of the upper (x 1.3): knob x 1.02 home (front of the port), -0.30
+  // held open; plate from 0.57 behind the knob (under the drum when held open) to the step 0.43…0.57 ahead of it.
+  // Origin = knob axis.
+  const handle = piece('장전손잡이', 1.02, 0.39, 0.3, [0, 0, 0], [0, -0.3, 0.2], carrier, 1);
+  at(handle, cylZ(0.03, 0.34, M.gunDark, 20), 0, 0, -0.05);                            // round stem from the carrier into the knob
+  at(handle, rbox(1.0, 0.056, 0.022, 0.008, M.gunDark), -0.07, -0.062, -0.08);        // slide plate, inside the slot
+  at(handle, rbox(0.07, 0.07, 0.022, 0.008, M.gunDark), -0.535, -0.062, -0.08);       // rounded rear end
+  at(handle, rbox(0.13, 0.15, 0.022, 0.008, M.gunDark), 0.495, -0.02, -0.08);         // the step rising into the port
+  at(handle, rbox(0.07, 0.035, 0.022, 0.006, M.gunDark), 0.575, 0.04, -0.08);         // its lip reaching forward ("ㄱ")
+  at(handle, rbox(0.06, 0.05, 0.12, 0.01, M.gunDark), 0.47, 0.0, -0.14);               // hook inward toward the carrier
   // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
   // the outer end hollowed out into a cup
   const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
@@ -1077,7 +1084,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const entry = g=>parts.explode.find(p=>p.g === g);
   // laid out (photo): op rod on top, carrier below it, handle beside the carrier, spring assembly at the bottom
   entry(sp).steps = [[0, 0.08, [0.05, 0, 0]], [0.28, 0.5, [-3.3, 0, 0]], [0.5, 0.62, [3.4, 0.55, 0.5]]];
-  entry(handle).steps = [[0.45, 0.53, [-1.43, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.83, 1.2, 0.6]],   // knob to the keyhole, out sideways
+  entry(handle).steps = [[0.45, 0.53, [-1.32, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.34, 1.2, 0.6]],   // knob to the keyhole, out sideways
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
   // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
@@ -1885,7 +1892,7 @@ document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
-const PORT0 = -0.48, PORT1 = 1.06;     // ejection port span (x)
+const PORT0 = -0.18, PORT1 = 1.1;     // ejection port span (x)
 let hudT = 0;
 // field-strip timeline helpers: eased 0→1 progress of S.ex through [a, b], and summing [a, b, offset] steps onto a vector
 function stepK(a, b){ const x = THREE.MathUtils.clamp((S.ex - a)/(b - a), 0, 1); return x*x*(3 - 2*x); }
