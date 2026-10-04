@@ -444,7 +444,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // edge vertices can be snapped onto the outline (smooth rounded edges, no stair-steps).
   const sdRR = (x, y, x0, x1, y0, y1, r)=>{ const qx = Math.abs(x - (x0 + x1)/2) - ((x1 - x0)/2 - r), qy = Math.abs(y - (y0 + y1)/2) - ((y1 - y0)/2 - r);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
-  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.12, 1.04, 0.34, 0.52, 0.045), sdRR(x, y, -0.9, 0.0, 0.34, 0.415, 0.035));   // (photos) port, and the slot behind it on the same bottom line
+  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.12, 1.04, 0.34, 0.52, 0.045), sdRR(x, y, -0.9, 0.0, 0.34, 0.415, 0.035), sdRR(x, y, -0.93, 1.04, 0.29, 0.36, 0.025));   // (photos) port, the slot behind it on the same bottom line, and the shallow channel the slide runs in under both
   const inPort = (x, y)=>sdPort(x, y) < 0;
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
@@ -488,6 +488,17 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     geo.setIndex(idx); geo.computeVertexNormals();
     const uMat = M.gun.clone(); uMat.vertexColors = true; uMat.side = THREE.DoubleSide; SHELL.push([uMat, 0.16]);
     rec.add(shadowed(new THREE.Mesh(geo, uMat)));
+    // (photo) floor of the shallow channel under the port and slot: a strip following the side wall 0.012 below its
+    // surface, worn bright along its edges; a dark liner behind the slot hides the hammer and carrier tail
+    { const zAt = (x, y)=>{ const c = uSec(x), si = Math.min(1, Math.abs((y - c.cy)/c.b)), sn = Math.pow(si, c.n/2); return c.a*Math.pow(Math.sqrt(Math.max(0, 1 - sn*sn)), 2/c.n); };
+      const NXf = 90, NYf = 6, X0 = -0.96, X1 = 1.07, Y0 = 0.28, Y1 = 0.35, fp = [], fc = [], fi = [];
+      for (let j=0;j<=NXf;j++) for (let i=0;i<=NYf;i++){ const x = X0 + (X1 - X0)*j/NXf, y = Y0 + (Y1 - Y0)*i/NYf;
+        fp.push(x, y, zAt(x, y) - 0.012); const e = sdRR(x, y, -0.93, 1.04, 0.29, 0.36, 0.025), k = 0.62 + 0.38*THREE.MathUtils.smoothstep(-e, 0.012, 0.0); fc.push(k, k, k); }
+      for (let j=0;j<NXf;j++) for (let i=0;i<NYf;i++){ const a = j*(NYf + 1) + i, b = a + NYf + 1; fi.push(a, b, a + 1, a + 1, b, b + 1); }
+      const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.Float32BufferAttribute(fc, 3)); fg.setIndex(fi); fg.computeVertexNormals();
+      const floor = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ color:0x5a5d62, map:parkMap, roughness:0.45, metalness:0.75, vertexColors:true }));
+      floor.receiveShadow = true; rec.add(floor); parts.portCover.push(floor);
+      const liner = at(rec, box(1.12, 0.16, 0.01, M.black), -0.385, 0.355, 0.15); parts.portCover.push(liner); }
     // front wall of the receiver: the section outline with holes for the barrel extension and the operating rod
     const fc = uSec(UX1), fs = new THREE.Shape();
     for (let i=0;i<=96;i++){ const p = uPt(UX1, i/96*Math.PI*2, fc); i ? fs.lineTo(-p.z, p.y) : fs.moveTo(-p.z, p.y); }
@@ -1052,7 +1063,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(handle, rbox(0.56, 0.042, 0.02, 0.012, M.gunDark), 0.31, -0.012, HZ);             // thin arm, along the slot
   at(handle, rbox(0.17, 0.15, 0.02, 0.012, M.gunDark), 0.615, 0.04, HZ);               // the step rising into the port
   at(handle, rbox(0.06, 0.035, 0.02, 0.008, M.gunDark), 0.72, 0.097, HZ);              // its lip reaching forward ("ㄱ")
-  at(handle, rbox(0.06, 0.05, 0.09, 0.01, M.gunDark), 0.6, 0.0, HZ - 0.05);            // hook inward onto the carrier
+  at(handle, rbox(0.06, 0.05, 0.04, 0.01, M.gunDark), 0.6, 0.0, HZ - 0.025);           // hook inward toward the carrier
   // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
   // the outer end hollowed out into a cup
   const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
