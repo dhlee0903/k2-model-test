@@ -444,7 +444,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // edge vertices can be snapped onto the outline (smooth rounded edges, no stair-steps).
   const sdRR = (x, y, x0, x1, y0, y1, r)=>{ const qx = Math.abs(x - (x0 + x1)/2) - ((x1 - x0)/2 - r), qy = Math.abs(y - (y0 + y1)/2) - ((y1 - y0)/2 - r);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
-  const sdPort = (x, y)=>Math.min(sdRR(x, y, 0.3, 1.16, 0.315, 0.455, 0.04), sdRR(x, y, -0.84, 0.34, 0.415, 0.455, 0.02), sdRR(x, y, -0.92, -0.76, 0.385, 0.485, 0.045));
+  const sdPort = (x, y)=>Math.min(sdRR(x, y, 0.15, 1.16, 0.33, 0.53, 0.05), sdRR(x, y, -0.84, 0.3, 0.405, 0.455, 0.02), sdRR(x, y, -0.92, -0.76, 0.385, 0.485, 0.045));
   const inPort = (x, y)=>sdPort(x, y) < 0;
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
@@ -460,6 +460,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
       if (x < -0.95){ const yMin = 0.14 + (-0.95 - x)/0.3*0.16; out.forEach(p=>{ if (p.y < yMin) p.y = yMin; }); }
       return out; };
     const rings = []; for (let j=0;j<=NX;j++) rings.push(ring(UX0 + (UX1 - UX0)*j/NX));
+    const rings0 = rings.map(r=>r.map(p=>p.clone()));                                   // unsnapped copy: the inner skin's normals come from it
     // snap the right-side vertices that lie just outside a hole onto its outline
     rings.forEach(r=>r.forEach(p=>{ if (p.z < 0.1) return; const d = sdPort(p.x, p.y); if (d <= 0 || d > 0.011) return;
       const e = 1e-4, gx = (sdPort(p.x + e, p.y) - sdPort(p.x - e, p.y))/(2*e), gy = (sdPort(p.x, p.y + e) - sdPort(p.x, p.y - e))/(2*e), gl = Math.hypot(gx, gy) || 1;
@@ -468,7 +469,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
       const r = rings[j], cy = uSec(r[0].x).cy;
       for (let i=0;i<=NT;i++){
         const p = r[i];
-        if (skin){ const a = r[(i + NT - 1) % NT], b = r[(i + 1) % NT], ty = b.y - a.y, tz = b.z - a.z, l = Math.hypot(ty, tz) || 1;
+        if (skin){ const r0 = rings0[j], a = r0[(i + NT - 1) % NT], b = r0[(i + 1) % NT], ty = b.y - a.y, tz = b.z - a.z, l = Math.hypot(ty, tz) || 1;
           let ny = tz/l, nz = -ty/l; if (ny*(p.y - cy) + nz*p.z < 0){ ny = -ny; nz = -nz; }
           const ic = p.y > 0.72 ? 1 : 0.18; pos.push(p.x, p.y - ny*UTHK, p.z - nz*UTHK); col.push(ic, ic, ic); }   // inner skin dark inside, body colour up in the hump
         else { pos.push(p.x, p.y, p.z); col.push(1, 1, 1); cut.push(p.z > 0.1 && sdPort(p.x, p.y) < -1e-4); }
@@ -521,16 +522,29 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(drumG, cylZ(0.112, 0.022, M.gunDark, 40), 0, 0, 0.29);                                 // drum rim
   at(drumG, cylZ(0.094, 0.012, drumM, 40), 0, 0, 0.302);                                    // face
   { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.006, 6, 40), M.black); at(drumG, ring, 0, 0, 0.3); }
-  for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; at(drumG, cylZ(0.012, 0.014, M.black, 10), Math.cos(a)*0.06, Math.sin(a)*0.06, 0.304); }
-  at(drumG, cylZ(0.007, 0.014, M.black, 8), DX, -0.072, 0.304);                          // index hole
+  // four spanner holes sunk into the face (dark floor + a chamfered lip)
+  for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4, hx = Math.cos(a)*0.058, hy = Math.sin(a)*0.058;
+    at(drumG, cylZ(0.015, 0.002, M.black, 16), hx, hy, 0.3085);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(0.0155, 0.0035, 6, 16), drumM); at(drumG, lip, hx, hy, 0.3075); }
   at(drumG, cylZ(0.028, 0.012, drumM, 16), 0, 0, 0.312);                                    // stud
-  at(drumG, cylZ(0.019, 0.014, M.steel, 6), 0, 0, 0.322);                                   // lock nut
   at(drumG, cylZ(0.008, 0.01, M.steel, 10), 0, 0, 0.332);
   tag(drumG, 'zeroW');
   at(drumG, box(0.012, 0.03, 0.004, M.steel), 0, 0.075, 0.309);                         // index mark on the drum face (shows the turn)
-  { const mk = engraved(g=>{ g.font = 'bold 40px sans-serif'; g.textBaseline = 'middle'; g.fillText('R', 6, 30); g.fillRect(52, 28, 56, 6); g.save(); g.translate(124, 30); g.rotate(-0.3); g.fillRect(-10, -2, 20, 4); g.restore(); },
-      150, 60, 0.15, 0.06, false);
-    mk.position.set(DX - 0.02, DY - 0.175, 0.2812); rs.add(mk); }
+  // (photo) a raised "R" under the drum and a curved arrow sweeping round beside it (turn this way to move the strike right)
+  { const cv = document.createElement('canvas'), bm = document.createElement('canvas'); cv.width = bm.width = 256; cv.height = bm.height = 160;
+    const draw = g=>{ g.font = 'bold 74px "Pretendard Variable", sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillText('R', 70, 92);
+      g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.arc(128, -40, 132, Math.PI*0.27, Math.PI*0.08, true); g.stroke();
+      const ax = 128 + Math.cos(Math.PI*0.08)*132, ay = -40 + Math.sin(Math.PI*0.08)*132;
+      g.beginPath(); g.moveTo(ax + 6, ay - 22); g.lineTo(ax + 20, ay + 8); g.lineTo(ax - 12, ay + 4); g.closePath(); g.fill(); };
+    const g = cv.getContext('2d'), gb = bm.getContext('2d');
+    g.save(); g.translate(3, 3); g.fillStyle = g.strokeStyle = 'rgba(0,0,0,.65)'; draw(g); g.restore();          // cast shadow: it stands proud
+    g.save(); g.translate(-1.5, -1.5); g.fillStyle = g.strokeStyle = 'rgba(150,152,156,.7)'; draw(g); g.restore();   // lit top edge
+    g.fillStyle = g.strokeStyle = '#2a2b2e'; draw(g);
+    gb.fillStyle = '#000'; gb.fillRect(0, 0, 256, 160); gb.fillStyle = gb.strokeStyle = '#fff'; draw(gb);
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+    const mk = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.125), new THREE.MeshStandardMaterial({ map:tex, bumpMap:new THREE.CanvasTexture(bm), bumpScale:0.006,
+      transparent:true, depthWrite:false, roughness:0.5, metalness:0.5, polygonOffset:true, polygonOffsetFactor:-2 }));
+    mk.position.set(DX + 0.02, DY - 0.16, 0.2812); rs.add(mk); }
   // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
   // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
   const flip = new THREE.Group(); flip.position.set(-0.8, 0.875, 0); rs.add(flip); parts.flip = flip;
@@ -908,12 +922,23 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
   // --- slotted flash hider: a tube, open at the front, the barrel's bore at the bottom of it ---
   M.bore = M.bore || new THREE.MeshStandardMaterial({ color:0x111213, roughness:0.6, metalness:0.6, side:THREE.BackSide });
-  const fh = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.75, 28, 1, true), M.gunDark)); fh.rotation.z = Math.PI/2; at(rec, fh, 6.79, BORE, 0);
-  const fhIn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.75, 24, 1, true), M.bore); fhIn.rotation.z = Math.PI/2; at(rec, fhIn, 6.79, BORE, 0);
+  // the body is a tube: solid at the back (x 6.42…6.62) and the front ring (7.06…7.165), between them slotted - six long
+  // slots round the top and sides, the bottom left closed (so it doesn't kick up dust)
+  { const RO = 0.1, RI = 0.06, X0 = 6.42, X1 = 6.62, X2 = 7.06, X3 = 7.165;
+    const sector = (a0, a1, len)=>{ const sh = new THREE.Shape(), N = 16;
+      for (let i=0;i<=N;i++){ const a = a0 + (a1 - a0)*i/N; i ? sh.lineTo(Math.sin(a)*RO, Math.cos(a)*RO) : sh.moveTo(Math.sin(a)*RO, Math.cos(a)*RO); }
+      for (let i=N;i>=0;i--){ const a = a0 + (a1 - a0)*i/N; sh.lineTo(Math.sin(a)*RI, Math.cos(a)*RI); }
+      const g = new THREE.ExtrudeGeometry(sh, { depth:len, bevelEnabled:false, curveSegments:4 }); return g; };
+    const tubeSeg = (xa, xb, a0, a1)=>{ const m = shadowed(new THREE.Mesh(sector(a0, a1, xb - xa), M.gunDark)); m.rotation.y = Math.PI/2; m.position.set(xa, BORE, 0); rec.add(m); return m; };
+    tubeSeg(X0, X1, 0, Math.PI*2); tubeSeg(X2, X3, 0, Math.PI*2);
+    const SW = 0.2, slots = [-2.2, -1.32, -0.44, 0.44, 1.32, 2.2];                   // slot centres, angle from the top
+    const edges = [-Math.PI + 0.6, ...slots.flatMap(c=>[c - SW, c + SW]), Math.PI - 0.6];
+    for (let i=0;i<edges.length;i+=2) tubeSeg(X1, X2, edges[i], edges[i + 1]);       // the bars between the slots
+    tubeSeg(X1, X2, Math.PI - 0.6, Math.PI + 0.6);                                     // closed bottom
+    const fhIn = new THREE.Mesh(new THREE.CylinderGeometry(RI, RI, X3 - X0, 24, 1, true), M.bore); fhIn.rotation.z = Math.PI/2; at(rec, fhIn, (X0 + X3)/2, BORE, 0); }
   const lip = shadowed(new THREE.Mesh(new THREE.RingGeometry(0.06, 0.1, 28), M.gunDark)); lip.rotation.y = Math.PI/2; at(rec, lip, 7.165, BORE, 0);
   const crown = new THREE.Mesh(new THREE.RingGeometry(0.033, 0.06, 24), M.bore); crown.rotation.y = -Math.PI/2; at(rec, crown, 6.42, BORE, 0);
   at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.033,-0.025],[0.11,-0.025],[0.11,0.025],[0.033,0.025],[0.033,-0.025]].map(([r, y])=>new THREE.Vector2(r, y)), 28), M.gunDark)), 6.42, BORE, 0).rotation.z = Math.PI/2;
-  for (let k=0;k<5;k++){ const a = k*Math.PI*2/5 + 0.3; at(rec, box(0.45, 0.025, 0.02, M.black), 6.86, BORE + Math.sin(a)*0.1, Math.cos(a)*0.1).rotation.x = a; }
   parts.muzzle = at(rec, new THREE.Object3D(), 7.17, BORE, 0);
 
   // === internals (K2 field-strip photo: boxy carrier with an AR-type rotating bolt, long-stroke piston on a silver
@@ -1015,16 +1040,22 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
   [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
   // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
-  const handle = piece('장전손잡이', 1.08, 0.435, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
-  at(handle, cylZ(0.03, 0.34, M.gunDark, 20), 0, 0, -0.05);                            // round stem from the carrier straight into the knob (no gap)
-  // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
-  // the outer end hollowed out into a cup
-  const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
-    [0.078,0.19],[0.074,0.205],[0.062,0.21],[0.05,0.205],[0.04,0.19],[0.02,0.182],[0.0,0.18]];
+  // charging handle (close-up photo, bolt held open): a long flat slide plate running in the thin slot, its front end
+  // stepping up ("ㄱ") into the port where it hooks onto the front of the carrier; the spool knob sits a third of the way
+  // back on the plate. Origin = the step at the carrier's front.
+  const handle = piece('장전손잡이', 1.08, 0.43, 0.3, [0, 0, 0], [-0.4, -0.3, 0.2], carrier, 1);
+  const KX = -0.4;                                                                     // knob, behind the step
+  at(handle, rbox(0.85, 0.042, 0.022, 0.008, M.gunDark), -0.42, 0, -0.03);             // slide plate, flush in the slot
+  at(handle, rbox(0.06, 0.1, 0.022, 0.008, M.gunDark), 0.0, 0.03, -0.03);              // the step rising into the port
+  at(handle, rbox(0.06, 0.06, 0.14, 0.01, M.gunDark), 0.0, 0.05, -0.12);               // hook into the carrier
+  at(handle, cylZ(0.032, 0.09, M.gunDark, 20), KX, 0, 0.0);                            // knob stem off the plate
+  // knob (photos): spool — flange, slim waist with a cross-pin hole, wide rounded rim hollowed into a cup
+  const knobPts = [[0.0,0.04],[0.066,0.04],[0.072,0.048],[0.072,0.07],[0.06,0.08],[0.048,0.09],[0.046,0.13],[0.06,0.143],[0.075,0.155],
+    [0.078,0.17],[0.074,0.185],[0.062,0.19],[0.05,0.185],[0.04,0.17],[0.02,0.162],[0.0,0.16]].map(([r, z])=>[r*1.25, z]);
   const knob = shadowed(new THREE.Mesh(new THREE.LatheGeometry(knobPts.map(([r, z])=>new THREE.Vector2(r, z)), 36), M.gunDark));
-  knob.rotation.x = Math.PI/2; handle.add(knob);                                     // lathe axis (y) → +z, out from the receiver
-  at(handle, cylX(0.009, 0.004, M.black, 10), 0.047, 0, 0.13);                        // cross-pin hole in the waist
-  at(handle, cylZ(0.012, 0.004, M.black, 10), 0, 0, 0.182);                          // small hole at the bottom of the cup
+  knob.rotation.x = Math.PI/2; knob.position.x = KX; handle.add(knob);              // lathe axis (y) → +z, out from the receiver
+  at(handle, cylX(0.011, 0.004, M.black, 10), KX + 0.059, 0, 0.11);                   // cross-pin hole in the waist
+  at(handle, cylZ(0.014, 0.004, M.black, 10), KX, 0, 0.162);                          // small hole at the bottom of the cup
   tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
   // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
@@ -1050,7 +1081,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const entry = g=>parts.explode.find(p=>p.g === g);
   // laid out (photo): op rod on top, carrier below it, handle beside the carrier, spring assembly at the bottom
   entry(sp).steps = [[0, 0.08, [0.05, 0, 0]], [0.28, 0.5, [-3.3, 0, 0]], [0.5, 0.62, [3.4, 0.55, 0.5]]];
-  entry(handle).steps = [[0.45, 0.53, [-1.92, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.88, 1.2, 0.6]],
+  entry(handle).steps = [[0.45, 0.53, [-1.52, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.48, 1.2, 0.6]],   // knob to the keyhole, out sideways
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
   // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
