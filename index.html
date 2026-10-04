@@ -73,6 +73,11 @@
   body.range #peep { display:block; }
   #pop { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.45); opacity:0; pointer-events:none; }
   #pop.go { animation:pop .8s ease-out; }
+  /* press-and-hold progress (stock fold) */
+  #holdRing { position:fixed; z-index:3; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%; pointer-events:none; --p:0%;
+              background:conic-gradient(var(--accent) var(--p), rgba(255,255,255,.55) 0); box-shadow:var(--shadow); display:grid; place-items:center; }
+  #holdRing[hidden] { display:none; }
+  #holdRing span { width:44px; height:44px; border-radius:50%; background:var(--chip-solid); display:grid; place-items:center; font-size:13px; font-weight:800; color:var(--fg); }
   @keyframes pop { 0% { opacity:1; transform:translate(-50%,-30%) scale(1.2); } 70% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-90%) scale(1); } }
   /* view switch (top centre) */
   #viewSeg { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:2px; padding:4px; border-radius:999px; }
@@ -162,6 +167,7 @@
 
 <div id="peep"></div>
 <div id="pop"></div>
+<div id="holdRing" hidden><span>꾹</span></div>
 <div id="viewSeg" class="glass"><button data-v="inspect" class="on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>점검</button><button data-v="range"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>사격장</button></div>
 <div id="dock" class="glass">
   <div class="grp">조작</div>
@@ -683,7 +689,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rec, cylY(0.07, 0.78, M.gunDark, 24), -1.5, 0.3, 0.27);
   [0.12, 0.3, 0.5].forEach(y=>at(rec, cylY(0.072, 0.008, M.black, 24), -1.5, y, 0.27));
   at(rec, cylY(0.045, 0.03, M.steel, 16), -1.5, 0.705, 0.27);
-  at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.32);
+  parts.stockLatch = at(rec, rbox(0.12, 0.08, 0.06, 0.02, M.dsteel), -1.47, -0.12, 0.32);   // fold latch: held in to fold the stock
   const hinge = new THREE.Group(); hinge.position.set(-1.5, 0.2, 0.27); rec.add(hinge); parts.stock = hinge;
   const sg = new THREE.Group(); sg.position.set(1.5, -0.2, -0.27); hinge.add(sg);
   // (photo) a slim, round wrist running straight back from the hinge, then flaring into a tall butt: the top line lifts
@@ -1323,7 +1329,7 @@ const S = {
   trigger:false, burst:0, cooldown:0, streak:0,
   kick:0, kickV:0, rise:0, riseV:0, flash:0, folded:false, fold:0, foldV:0, clear:false,
   bayonet:false, bay:0, disasm:0, ex:0, ex2:0, gas:2, gasAng:0, gasPush:0, spent:false, cycle:null, feed:null, held:false, catchPulled:false, catchUp:0, flip:0, flipA:0, night:0, nightA:0,
-  hits:0, points:0, rangeShots:0, sling:true, slingA:1,
+  hits:0, points:0, rangeShots:0, sling:false, slingA:0, stockHold:null,
   // zeroing: the rifle comes with its own error (cells on the 25 m sheet); clicks move the strike by one cell each
   zx:(Math.random() < 0.5 ? -1 : 1)*(1.5 + Math.random()*3), zy:(Math.random() < 0.5 ? -1 : 1)*(1 + Math.random()*3), wind:0, elev:0, group:[],
 };
@@ -1524,7 +1530,11 @@ function newMag(){
 }
 function toggleNight(){ S.night = 1 - S.night; burst({ freq:2800, q:3, vol:0.35, dur:0.02 }); say(S.night ? '야간가늠자 세움' : '야간가늠자 눕힘'); }
 function toggleFlip(){ S.flip = 1 - S.flip; burst({ freq:3200, q:3, vol:0.35, dur:0.02 }); say(S.flip ? '가늠자 젖힘 — 큰 구멍 (근거리·야간)' : '가늠자 세움 — 작은 구멍 (정밀 조준)'); }
-function toggleStock(){ S.folded = !S.folded; SND.fold(); renderHud(); }
+// the stock only folds (or locks open again) while its hinge latch is held in: press and hold ~0.6 s
+const STOCK_HOLD = 0.6;
+function startStockHold(x, y){ if (S.stockHold) return; S.stockHold = { t:0, x, y }; holdRing.style.left = x + 'px'; holdRing.style.top = y + 'px'; holdRing.hidden = false; }
+function endStockHold(){ if (!S.stockHold) return; const done = S.stockHold.done; S.stockHold = null; holdRing.hidden = true; if (!done) say('개머리판은 경첩 걸쇠를 꾹 눌러야 접혀요'); }
+function toggleStock(){ S.folded = !S.folded; SND.fold(); say(S.folded ? '개머리판 접힘' : '개머리판 펼침'); }
 function toggleClear(){ S.clear = !S.clear; setClear(S.clear); renderHud(); }
 function toggleSling(){ S.sling = !S.sling; SND.fold(); say(S.sling ? '멜빵 결합' : '멜빵 분리'); renderHud(); }
 function toggleBayonet(){
@@ -1593,7 +1603,7 @@ function zeroClick(axis, d){
 }
 const zFmt = (v, p, n)=>v === 0 ? '0' : `${v > 0 ? p : n} ${Math.abs(v)}`;
 function newSheet(){ drawTarget(); targetTex.needsUpdate = true; S.hits = S.rangeShots = 0; S.group = []; SND.fold(); say('표적지 교체'); }
-const popEl = document.getElementById('pop');
+const popEl = document.getElementById('pop'), holdRing = document.getElementById('holdRing');
 function popScore(t){ popEl.textContent = t; popEl.classList.remove('go'); void popEl.offsetWidth; popEl.classList.add('go'); renderHud(); }
 
 // ---------- views ----------
@@ -1641,7 +1651,7 @@ function setHint(){
              : [['', '마우스 조준'], ['Space', '발사'], ['←→', '돌림쇠'], ['↑↓', '상하조정나사'], ['T', '표적지 교체'], ['Q', '조정간'], ['F', '노리쇠'], ['R', '탄창'], ['Tab', '점검']])
     : (TOUCH ? [['', '총을 눌러 방아쇠'], ['', '장전손잡이 뒤로 끌기'], ['', '탄창·대검·개머리판도 눌러보세요']]
              : [['', '클릭 방아쇠'], ['', '장전손잡이 드래그'], ['Q', '조정간'], ['F', '노리쇠'], ['C', '노리쇠멈치'], ['E', '가늠자'], ['Y', '야간가늠자'], ['R', '탄창'], ['N', '새 탄창'],
-                ['V', '개머리판'], ['B', '대검'], ['M', '멜빵'], ['G', '가스'], ['D', '분해'], ['X', '투명'], ['Tab', '사격장']]);
+                ['V', '꾹 개머리판'], ['B', '대검'], ['M', '멜빵'], ['G', '가스'], ['D', '분해'], ['X', '투명'], ['Tab', '사격장']]);
   h.innerHTML = items.map(([k, t])=>`<span>${k ? `<kbd>${k}</kbd>` : ''}${t}</span>`).join('');
 }
 
@@ -1721,7 +1731,7 @@ cvs.addEventListener('pointerdown', e=>{
   else if (part === 'zeroW'){ active = 'ui'; zeroClick('w', e.shiftKey ? -1 : 1); }
   else if (part === 'zeroE'){ active = 'ui'; zeroClick('e', e.shiftKey ? -1 : 1); }
   else if (part === 'mag'){ active = 'ui'; toggleMag(); }
-  else if (part === 'stock'){ active = 'ui'; toggleStock(); }
+  else if (part === 'stock'){ active = 'stockHold'; startStockHold(e.clientX, e.clientY); }
   else if (part === 'bayonet'){ active = 'ui'; toggleBayonet(); }
   else if (part === 'sling'){ active = 'ui'; toggleSling(); }
   else if (part === 'gas'){ active = 'ui'; cycleGas(); }
@@ -1755,6 +1765,7 @@ cvs.addEventListener('pointermove', e=>{
 function endPointer(){
   if (active === 'trigger') releaseTrigger();
   if (active === 'handle') chargeRelease();
+  if (active === 'stockHold') endStockHold();
   active = null; touchAim = null;
   if (view === 'inspect') controls.enabled = true;
 }
@@ -1769,7 +1780,9 @@ document.getElementById('bCharge').onclick = ()=>{ ac(); chargeAuto(); };
 document.getElementById('bCatch').onclick = ()=>{ ac(); boltCatch(); };
 document.getElementById('bMag').onclick = ()=>{ ac(); toggleMag(); };
 document.getElementById('bNew').onclick = ()=>{ ac(); newMag(); };
-document.getElementById('bStock').onclick = ()=>{ ac(); toggleStock(); };
+{ const b = document.getElementById('bStock');
+  b.addEventListener('pointerdown', e=>{ ac(); const r = b.getBoundingClientRect(); startStockHold(r.left + r.width/2, r.top + r.height/2); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev=>b.addEventListener(ev, endStockHold)); }
 document.getElementById('bClear').onclick = toggleClear;
 document.getElementById('gasChip').onclick = ()=>{ ac(); cycleGas(); };
 document.getElementById('bBay').onclick = ()=>{ ac(); toggleBayonet(); };
@@ -1792,7 +1805,7 @@ addEventListener('keydown', e=>{
     case 'KeyY': toggleNight(); break;
     case 'KeyR': toggleMag(); break;
     case 'KeyN': newMag(); break;
-    case 'KeyV': toggleStock(); break;
+    case 'KeyV': startStockHold(innerWidth/2, innerHeight/2); break;
     case 'KeyX': toggleClear(); break;
     case 'KeyB': toggleBayonet(); break;
     case 'KeyM': toggleSling(); break;
@@ -1806,7 +1819,7 @@ addEventListener('keydown', e=>{
     case 'Tab': e.preventDefault(); setView(view === 'range' ? 'inspect' : 'range'); break;
   }
 });
-addEventListener('keyup', e=>{ if (e.code === 'Space'){ e.preventDefault(); releaseTrigger(); } });
+addEventListener('keyup', e=>{ if (e.code === 'Space'){ e.preventDefault(); releaseTrigger(); } if (e.code === 'KeyV') endStockHold(); });
 addEventListener('contextmenu', e=>e.preventDefault());
 ['gesturestart', 'gesturechange'].forEach(t=>document.addEventListener(t, e=>e.preventDefault()));
 document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
@@ -1884,6 +1897,12 @@ function animate(){
 
   parts.drum.rotation.z += (-S.wind*Math.PI/8 - parts.drum.rotation.z) * Math.min(1, dt*16);
   parts.elevScrew.rotation.y += (S.elev*Math.PI/4 - parts.elevScrew.rotation.y) * Math.min(1, dt*16);
+  if (S.stockHold && !S.stockHold.done){
+    S.stockHold.t += dt; const k = Math.min(1, S.stockHold.t/STOCK_HOLD);
+    holdRing.style.setProperty('--p', (k*100).toFixed(0) + '%');
+    if (k >= 1){ S.stockHold.done = true; toggleStock(); holdRing.hidden = true; }
+  }
+  parts.stockLatch.position.z += ((S.stockHold && !S.stockHold.done ? 0.29 : 0.32) - parts.stockLatch.position.z) * Math.min(1, dt*20);   // latch pushed in
   S.flipA += (S.flip - S.flipA) * Math.min(1, dt*14); parts.flip.rotation.z = -S.flipA*Math.PI/2;   // flips forward onto the other leaf
   S.nightA += (S.night - S.nightA) * Math.min(1, dt*14); parts.nightSight.rotation.z = -(1 - S.nightA)*Math.PI/2;   // lies folded forward until raised
   const up = S.held || S.catchPulled ? 1 : 0;
