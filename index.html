@@ -403,7 +403,7 @@ function makeRound(live){
 
 // ---------- rifle: dimensions taken from a side photo of the K2 ----------
 // muzzle +x, up +y, right side +z; 1 unit ≈ 85 mm, bore line y = 0.38
-const SIGHT_Y = 0.97, TRAVEL = 1.32, BORE = 0.38;
+const SIGHT_Y = 0.97, TRAVEL = 1.4, BORE = 0.38;
 const gun = new THREE.Group(), rec = new THREE.Group(); gun.add(rec);
 const parts = { portCover:[], labels1:[] };
 function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
@@ -444,7 +444,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // edge vertices can be snapped onto the outline (smooth rounded edges, no stair-steps).
   const sdRR = (x, y, x0, x1, y0, y1, r)=>{ const qx = Math.abs(x - (x0 + x1)/2) - ((x1 - x0)/2 - r), qy = Math.abs(y - (y0 + y1)/2) - ((y1 - y0)/2 - r);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
-  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.18, 1.1, 0.33, 0.51, 0.045), sdRR(x, y, -0.86, -0.1, 0.295, 0.415, 0.02));   // (photos) port, slot under it
+  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.12, 1.04, 0.34, 0.52, 0.045), sdRR(x, y, -0.9, 0.0, 0.34, 0.415, 0.035));   // (photos) port, and the slot behind it on the same bottom line
   const inPort = (x, y)=>sdPort(x, y) < 0;
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
@@ -964,9 +964,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     const g = new THREE.ExtrudeGeometry(sh, { depth:0.62, bevelEnabled:true, bevelThickness:0.014, bevelSize:0.008, bevelSegments:3, curveSegments:48 });
     g.rotateY(Math.PI/2); g.translate(-0.13, 0, 0);                                       // runs x -0.13 … 0.49 (front lip)
     body.add(shadowed(new THREE.Mesh(g, M.carrier))); }
-  at(body, cylX(CT, 0.36, M.carrier, 40), -0.32, 0, 0);                                    // tail
+  at(body, cylX(CT, 0.3, M.carrier, 40), -0.29, 0, 0);                                     // tail (ends x 0.18: clears the rear plug at full travel)
   { const ch = new THREE.Mesh(new THREE.CylinderGeometry(CT, CR, 0.03, 40), M.carrier); ch.rotation.z = Math.PI/2; at(body, shadowed(ch), -0.145, 0, 0); }   // shoulder
-  { const ch = new THREE.Mesh(new THREE.CylinderGeometry(CT - 0.014, CT, 0.02, 40), M.carrier); ch.rotation.z = Math.PI/2; at(body, shadowed(ch), -0.51, 0, 0); }  // rear chamfer
+  { const ch = new THREE.Mesh(new THREE.CylinderGeometry(CT - 0.014, CT, 0.02, 40), M.carrier); ch.rotation.z = Math.PI/2; at(body, shadowed(ch), -0.45, 0, 0); }  // rear chamfer
   // recessed slots and windows: a dark stadium bent round the cylinder (angle th0 = centre: 0 right, π/2 top, π left),
   // optionally slanted (the cam track twists as it runs forward), with a thin bright rim round the cut edge
   const slot = (r, cx, len, th0, w, twist = 0, rim = true, fill = M.black)=>{
@@ -990,7 +990,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(body, cylX(0.07, 0.006, M.black, 28), 0.497, 0, 0);                                  // bolt bore at the front
   { const lip = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.008, 8, 40), M.carrier); lip.rotation.y = Math.PI/2; at(body, shadowed(lip), 0.49, 0, 0); }
   at(body, cylX(0.03, 0.006, M.black, 14), -0.522, 0, 0);                                 // firing-pin hole at the back
-  [-0.47, -0.43].forEach(x=>{ const g = new THREE.Mesh(new THREE.TorusGeometry(CT, 0.0035, 6, 40), M.black); g.rotation.y = Math.PI/2; at(body, g, x, 0, 0); });   // turned grooves on the tail
+  [-0.41, -0.37].forEach(x=>{ const g = new THREE.Mesh(new THREE.TorusGeometry(CT, 0.0035, 6, 40), M.black); g.rotation.y = Math.PI/2; at(body, g, x, 0, 0); });   // turned grooves on the tail
   // top: raised lug with a cross hole ahead of the op-rod slot
   at(body, rbox(0.12, 0.07, 0.08, 0.015, M.carrier), 0.06, 0.145, 0);
   at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.15, 0);
@@ -1039,18 +1039,20 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rod, cylX(0.035, 0.9, M.oprod, 16), 2.35, 0, 0);
   at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
   [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
-  // charging handle (photos, bolt forward + held open): a flat slide plate running in the slot under the port, the spool
-  // knob on its rear half and a "ㄱ" step on its front end that shows in the port when the bolt is back. Measured from the
-  // photos against the drum (x -0.85) and the front of the upper (x 1.3): knob x 1.02 home (front of the port), -0.30
-  // held open; plate from 0.57 behind the knob (under the drum when held open) to the step 0.43…0.57 ahead of it.
+  // charging handle (photos: bolt forward, held open, and the slide with its knob pulled off): a slide inside the right
+  // wall — its rear end is the round seat the spool knob plugs into, a thin arm runs forward from it and ends in a raised
+  // "ㄱ" step that shows in the port when the bolt is back. Measured on the held-open photo (perspective corrected, drum
+  // x -0.85 / front of the upper 1.3): knob axis -0.45, step 0.09…0.25, so it sits 0.53…0.70 ahead of the knob. Bolt
+  // forward the knob is at the front of the port (x 0.95) and the arm and step are hidden in the front of the upper.
   // Origin = knob axis.
-  const handle = piece('장전손잡이', 1.02, 0.39, 0.3, [0, 0, 0], [0, -0.3, 0.2], carrier, 1);
-  at(handle, cylZ(0.03, 0.34, M.gunDark, 20), 0, 0, -0.05);                            // round stem from the carrier into the knob
-  at(handle, rbox(1.0, 0.056, 0.022, 0.008, M.gunDark), -0.07, -0.062, -0.08);        // slide plate, inside the slot
-  at(handle, rbox(0.07, 0.07, 0.022, 0.008, M.gunDark), -0.535, -0.062, -0.08);       // rounded rear end
-  at(handle, rbox(0.13, 0.15, 0.022, 0.008, M.gunDark), 0.495, -0.02, -0.08);         // the step rising into the port
-  at(handle, rbox(0.07, 0.035, 0.022, 0.006, M.gunDark), 0.575, 0.04, -0.08);         // its lip reaching forward ("ㄱ")
-  at(handle, rbox(0.06, 0.05, 0.12, 0.01, M.gunDark), 0.47, 0.0, -0.14);               // hook inward toward the carrier
+  const handle = piece('장전손잡이', 0.95, 0.38, 0.3, [0, 0, 0], [0.3, -0.3, 0.2], carrier, 1);
+  const HZ = -0.095;                                                                   // slide plane, just inside the wall
+  at(handle, cylZ(0.026, 0.17, M.gunDark, 20), 0, 0, -0.015);                          // knob shank through the slot
+  at(handle, rbox(0.14, 0.1, 0.02, 0.045, M.gunDark), 0, -0.005, HZ);                  // round knob seat (rear end)
+  at(handle, rbox(0.56, 0.042, 0.02, 0.012, M.gunDark), 0.31, -0.012, HZ);             // thin arm, along the slot
+  at(handle, rbox(0.17, 0.15, 0.02, 0.012, M.gunDark), 0.615, 0.04, HZ);               // the step rising into the port
+  at(handle, rbox(0.06, 0.035, 0.02, 0.008, M.gunDark), 0.72, 0.097, HZ);              // its lip reaching forward ("ㄱ")
+  at(handle, rbox(0.06, 0.05, 0.09, 0.01, M.gunDark), 0.6, 0.0, HZ - 0.05);            // hook inward onto the carrier
   // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
   // the outer end hollowed out into a cup
   const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
@@ -1067,7 +1069,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(sp, cylX(0.014, 1.5, M.steel, 8), 0.75, 0, 0);
   const rsp = coil(0.04, 70, 0.0075, M.spring); rsp.rotation.z = -Math.PI/2; rsp.position.set(0.04, 0, 0); sp.add(rsp); parts.recoilSpring = rsp;
   at(sp, rbox(0.1, 0.24, 0.3, 0.03, M.steel), 0, 0, 0);                         // supporter
-  at(sp, rbox(0.1, 0.2, 0.46, 0.02, M.gunDark), -0.12, -0.105, 0);              // plug filling the rear opening of the upper
+  at(sp, rbox(0.1, 0.13, 0.46, 0.02, M.gunDark), -0.12, -0.07, 0);               // plug filling the rear opening of the upper (above the carrier tail)
   // latch (photos): knurled tab sticking up at the back of the upper; push it in to let the upper hinge open
   // latch (photo): a quarter-gear — a fan-shaped tab whose arc is cut with teeth, sticking up behind the sight fins
   const LX = -0.14, LY = 0.06, LR = 0.1, A0 = Math.PI*0.32, A1 = Math.PI*0.82;
@@ -1084,7 +1086,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const entry = g=>parts.explode.find(p=>p.g === g);
   // laid out (photo): op rod on top, carrier below it, handle beside the carrier, spring assembly at the bottom
   entry(sp).steps = [[0, 0.08, [0.05, 0, 0]], [0.28, 0.5, [-3.3, 0, 0]], [0.5, 0.62, [3.4, 0.55, 0.5]]];
-  entry(handle).steps = [[0.45, 0.53, [-1.32, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.34, 1.2, 0.6]],   // knob to the keyhole, out sideways
+  entry(handle).steps = [[0.45, 0.53, [-1.4, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.49, 1.2, 0.6]],   // knob to the keyhole, out sideways
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
   // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
@@ -1892,7 +1894,7 @@ document.addEventListener('dblclick', e=>e.preventDefault(), { passive:false });
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const MAG_DIR = new THREE.Vector3(0.12, -1, 0).normalize();
-const PORT0 = -0.18, PORT1 = 1.1;     // ejection port span (x)
+const PORT0 = -0.12, PORT1 = 1.04;     // ejection port span (x)
 let hudT = 0;
 // field-strip timeline helpers: eased 0→1 progress of S.ex through [a, b], and summing [a, b, offset] steps onto a vector
 function stepK(a, b){ const x = THREE.MathUtils.clamp((S.ex - a)/(b - a), 0, 1); return x*x*(3 - 2*x); }
