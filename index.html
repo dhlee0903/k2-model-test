@@ -1208,10 +1208,10 @@ ground.rotation.x = -Math.PI/2; ground.position.y = -3.4; ground.receiveShadow =
 
 // ---------- range ----------
 const RANGE_GROUND = -17, TARGET_X = 200;
-// 25 m zeroing sheet (25m 영점표적지 K2): 26 × 34 grid of 1-cell squares, columns 13…0…13, rows 19 above to 15 below
-// the zero point. Canvas 1024×1536 maps onto a TW × TH plane.
-const TW = 14, TH = 21, TCV = { W:1024, H:1536, CELL:36.6, X0:512, Y0:841 };
-const ZERO_UP = 1.4;                  // the black aiming dot sits 1.4 cells above the zero point (a zeroed rifle aimed at it hits the zero)
+// 25 m zeroing sheet (25m 영점표적지 K2, user photo): 26 × 34 grid of squares, columns 13…0…13, rows 17 up to 17 down from
+// the line through the aiming disk (labels 16…0…16). The zero mark (×, centre of the zero circle) is 1.75 cells below
+// the aiming disk. Canvas 1024×1536 maps onto a TW × TH plane; X0/Y0 is the zero mark.
+const TW = 14, TH = 21, ZERO_UP = 1.75, ZERO_R = 2.2, TCV = { W:1024, H:1536, CELL:35, X0:512, Y0:140 + 17*35 + 1.75*35 };
 const range = new THREE.Group(); range.visible = false; scene.add(range);
 const aim = new THREE.Group(); aim.rotation.order = 'YZX'; scene.add(aim);
 let targetCanvas, targetTex, target;
@@ -1241,54 +1241,61 @@ let targetCanvas, targetTex, target;
 })();
 function drawTarget(){
   const g = targetCanvas.getContext('2d'), { W, H, CELL:C, X0, Y0 } = TCV;
-  const X = c => X0 + c*C, Y = r => Y0 - r*C;                 // grid coords (cells; +r up) → canvas
-  const ink = '#2b2b2b', KO = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-  g.fillStyle = '#efece3'; g.fillRect(0, 0, W, H);
-  // paper texture + fold lines
-  for (let i=0;i<4000;i++){ g.fillStyle = `rgba(0,0,0,${Math.random()*0.035})`; g.fillRect(Math.random()*W, Math.random()*H, 2, 2); }
-  g.strokeStyle = 'rgba(0,0,0,.06)'; g.lineWidth = 3; [[W/2, 0, W/2, H], [0, H/2, W, H/2]].forEach(([a,b,c,d])=>{ g.beginPath(); g.moveTo(a,b); g.lineTo(c,d); g.stroke(); });
+  const X = c => X0 + c*C, Y = r => Y0 - (r + ZERO_UP)*C;     // grid coords (cells from the aiming-disk line; +r up) → canvas
+  const ink = '#333436', KO = '"Pretendard Variable", Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif',
+        MJ = '"Nanum Myeongjo", "Batang", "AppleMyungjo", serif';
+  // paper: off-white, faint grain, the two fold creases
+  g.fillStyle = '#eceeed'; g.fillRect(0, 0, W, H);
+  for (let i=0;i<5000;i++){ g.fillStyle = `rgba(0,0,0,${Math.random()*0.03})`; g.fillRect(Math.random()*W, Math.random()*H, 2, 2); }
+  g.strokeStyle = 'rgba(0,0,0,.07)'; g.lineWidth = 3; [[W/2 - 6, 0, W/2 - 6, H], [0, Y(0) + 4, W, Y(0) + 4]].forEach(([a,b,c,d])=>{ g.beginPath(); g.moveTo(a,b); g.lineTo(c,d); g.stroke(); });
   g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `bold 58px ${KO}`; g.fillText('25m 영점표적지(K2)', W/2, 70);
-  // grid: thin every cell, thick every 5 and on the zero lines
-  for (let c=-13;c<=13;c++){ g.lineWidth = c % 5 === 0 ? 4 : 1.3; g.strokeStyle = ink; g.beginPath(); g.moveTo(X(c), Y(19)); g.lineTo(X(c), Y(-15)); g.stroke(); }
-  for (let r=-15;r<=19;r++){ g.lineWidth = r % 5 === 0 ? 4 : 1.3; g.beginPath(); g.moveTo(X(-13), Y(r)); g.lineTo(X(13), Y(r)); g.stroke(); }
-  g.font = `22px ${KO}`;
-  for (let c=-13;c<=13;c++){ g.fillText(Math.abs(c), X(c), Y(19) - 16); g.fillText(Math.abs(c), X(c), Y(-15) + 18); }
-  for (let r=-15;r<=19;r++){ g.fillText(Math.abs(r), X(-13) - 22, Y(r)); g.fillText(Math.abs(r), X(13) + 22, Y(r)); }
-  // black figure (cells): top bar, left leg, right leg
-  const FIG = [[-6, 6, 0, 8], [0, 5, 7, 9], [-6, 1, -3, 6], [4, 2, 7, 5]];
-  g.fillStyle = '#3a3a3a'; FIG.forEach(([c0, r0, c1, r1])=>g.fillRect(X(c0), Y(r1), (c1 - c0)*C, (r1 - r0)*C));
-  g.save(); g.beginPath(); FIG.forEach(([c0, r0, c1, r1])=>g.rect(X(c0), Y(r1), (c1 - c0)*C, (r1 - r0)*C)); g.clip();
-  g.strokeStyle = 'rgba(239,236,227,.55)'; g.lineWidth = 1.2;   // the grid shows faintly through the print
-  for (let c=-6;c<=7;c++){ g.beginPath(); g.moveTo(X(c), Y(9)); g.lineTo(X(c), Y(1)); g.stroke(); }
-  for (let r=1;r<=9;r++){ g.beginPath(); g.moveTo(X(-6), Y(r)); g.lineTo(X(7), Y(r)); g.stroke(); }
+  g.font = `bold 62px ${MJ}`; g.fillText('25m 영점표적지(K2)', W/2, 78);
+  // black figure (photo): a ㄇ arch — 14 cells wide, 7 high, standing on the aiming-disk line, 8 × 4 opening under it
+  g.fillStyle = '#3c3d3e'; g.fillRect(X(-7), Y(7), 14*C, 7*C);
+  g.fillStyle = '#eceeed'; g.fillRect(X(-4), Y(4), 8*C, 4*C);
+  // grid over it, but not over the black print: thin every cell, heavier every 5 and on the 0 lines
+  g.save(); g.beginPath(); g.rect(0, 0, W, H); g.rect(X(7), Y(7), -14*C, 7*C); g.rect(X(-4), Y(4), 8*C, 4*C); g.clip('evenodd');
+  for (let c=-13;c<=13;c++){ g.lineWidth = c % 5 === 0 ? 3.2 : 1.1; g.strokeStyle = c % 5 === 0 ? '#3a3b3d' : '#6c6e70'; g.beginPath(); g.moveTo(X(c), Y(17)); g.lineTo(X(c), Y(-17)); g.stroke(); }
+  for (let r=-17;r<=17;r++){ g.lineWidth = r % 5 === 0 || Math.abs(r) === 17 ? 3.2 : 1.1; g.strokeStyle = r % 5 === 0 ? '#3a3b3d' : '#6c6e70'; g.beginPath(); g.moveTo(X(-13), Y(r)); g.lineTo(X(13), Y(r)); g.stroke(); }
   g.restore();
-  // aiming dot, zero circle and the zero mark
-  g.fillStyle = '#151515'; g.beginPath(); g.ellipse(X(0), Y(ZERO_UP), 0.72*C, 0.56*C, 0, 0, Math.PI*2); g.fill();
-  g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.arc(X(0), Y(0), 1.75*C, 0, Math.PI*2); g.stroke();
-  g.lineWidth = 2.5; [0, Math.PI/3, -Math.PI/3].forEach(a=>{ g.beginPath(); g.moveTo(X(0) - Math.cos(a)*9, Y(0) - Math.sin(a)*9); g.lineTo(X(0) + Math.cos(a)*9, Y(0) + Math.sin(a)*9); g.stroke(); });
-  // adjustment icons and their names
-  const drum = (c, r, cw)=>{ const x = X(c), y = Y(r); g.fillStyle = '#efece3'; g.beginPath(); g.arc(x, y, 0.95*C, 0, Math.PI*2); g.fill(); g.strokeStyle = ink; g.lineWidth = 2; g.stroke();
-    g.beginPath(); g.arc(x, y, 0.55*C, 0, Math.PI*2); g.stroke(); g.fillStyle = ink;
-    for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; g.beginPath(); g.arc(x + Math.cos(a)*0.32*C, y + Math.sin(a)*0.32*C, 3.5, 0, Math.PI*2); g.fill(); }
-    g.beginPath(); g.arc(x, y, 4, 0, Math.PI*2); g.fill();
-    g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, 1.2*C, cw ? -2.4 : -0.74, cw ? -0.74 : -2.4, !cw); g.stroke();
-    const ea = cw ? -0.74 : -2.4, ex = x + Math.cos(ea)*1.2*C, ey = y + Math.sin(ea)*1.2*C;
-    g.beginPath(); g.moveTo(ex, ey + 9); g.lineTo(ex - 7, ey - 3); g.lineTo(ex + 7, ey - 3); g.closePath(); g.fill(); };
-  const screw = (c, r, up)=>{ const x = X(c), y = Y(r); g.fillStyle = '#efece3'; g.fillRect(x - 0.9*C, y - 0.9*C, 1.8*C, 1.8*C);
-    g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 0.6*C, y + 0.5*C); g.lineTo(x - 0.6*C, y - 0.1*C); g.lineTo(x, y - 0.6*C); g.lineTo(x + 0.6*C, y - 0.1*C); g.lineTo(x + 0.6*C, y + 0.5*C); g.closePath(); g.stroke();
-    g.fillRect(x - 0.35*C, y - 0.75*C, 0.7*C, 0.2*C); g.beginPath(); g.arc(x, y + 0.15*C, 0.2*C, 0, Math.PI*2); g.fill();
-    g.beginPath(); g.moveTo(x + 0.9*C, y + 0.6*C); g.lineTo(x + 0.9*C, y - 0.6*C); g.stroke(); g.beginPath(); g.moveTo(x + 0.9*C, y + (up ? -0.75 : 0.75)*C); g.lineTo(x + 0.75*C, y + (up ? -0.45 : 0.45)*C); g.lineTo(x + 1.05*C, y + (up ? -0.45 : 0.45)*C); g.closePath(); g.fill(); };
-  drum(-7, 17, true); drum(6, 17, false); drum(-7, -14, true); drum(7, -14, false);
-  screw(-12, 10, true); screw(12, 10, true); screw(-11, -5, true); screw(12, -5, true);
-  g.fillStyle = ink; g.font = `bold 25px ${KO}`;
-  [['가늠자돌림쇠', -7, 15.6], ['가늠자돌림쇠', 6, 15.6], ['가늠자돌림쇠', -7.5, -12.6], ['가늠자돌림쇠', 7.6, -12.6],
-   ['가늠자상하조정나사', -9.5, 8.6], ['가늠자상하조정나사', 9.6, 8.6], ['가늠자상하조정나사', -9.7, -6.6], ['가늠자상하조정나사', 9.6, -6.6],
-   ['가늠자상하조정나사 "2.5" 사용', 0.4, -11.6]].forEach(([t, c, r])=>{ g.fillStyle = '#efece3'; const w = g.measureText(t).width + 10; g.fillRect(X(c) - w/2, Y(r) - 15, w, 30); g.fillStyle = ink; g.fillText(t, X(c), Y(r)); });
+  // numbers: columns along the top and bottom, rows down both sides (the border lines ±17 are not numbered)
+  g.fillStyle = ink; g.font = `20px ${KO}`;
+  for (let c=-13;c<=13;c++){ g.fillText(Math.abs(c), X(c), Y(17) - 16); g.fillText(Math.abs(c), X(c), Y(-17) + 17); }
+  for (let r=-16;r<=16;r++){ g.fillText(Math.abs(r), X(-13) - 22, Y(r)); g.fillText(Math.abs(r), X(13) + 22, Y(r)); }
+  // aiming disk on the line under the arch, the zero circle and the × at the zero point below it
+  g.fillStyle = '#4a4b4d'; g.beginPath(); g.arc(X(0), Y(0), 0.9*C, 0, Math.PI*2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 2; [-0.6, 0.6].forEach(a=>{ g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(0) + Math.sin(a)*0.8*C, Y(0) - Math.cos(a)*0.8*C); g.stroke(); });
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(0), Y(0) + 0.8*C); g.stroke();
+  g.strokeStyle = ink; g.lineWidth = 1.6; g.beginPath(); g.arc(X0, Y0, ZERO_R*C, 0, Math.PI*2); g.stroke();
+  g.lineWidth = 2; [[-1, -1], [1, -1]].forEach(([a, b])=>{ g.beginPath(); g.moveTo(X0 - a*7, Y0 - b*7); g.lineTo(X0 + a*7, Y0 + b*7); g.stroke(); });
+  // adjustment icons (photo): windage drum = ring, four holes, centre stud, a curved arrow on the outside;
+  // elevation screw = slotted head over a little housing with an arrow beside it
+  const paper = '#eceeed';
+  const drum = (c, r, cw)=>{ const x = X(c), y = Y(r), R = 0.62*C; g.fillStyle = paper; g.beginPath(); g.arc(x, y, R + 4, 0, Math.PI*2); g.fill();
+    g.strokeStyle = ink; g.lineWidth = 1.8; g.beginPath(); g.arc(x, y, R, 0, Math.PI*2); g.stroke(); g.beginPath(); g.arc(x, y, R*0.55, 0, Math.PI*2); g.stroke();
+    g.fillStyle = ink; for (let k=0;k<4;k++){ const a = k*Math.PI/2 + Math.PI/4; g.beginPath(); g.arc(x + Math.cos(a)*R*0.78, y + Math.sin(a)*R*0.78, 2.6, 0, Math.PI*2); g.fill(); }
+    g.beginPath(); g.arc(x, y, 3, 0, Math.PI*2); g.fill();
+    const s0 = cw ? -1.0 : Math.PI - 1.0, s1 = cw ? 1.0 : Math.PI + 1.0, RR = R + 9;   // arc on the right (clockwise) or left (counter-clockwise)
+    g.lineWidth = 2; g.beginPath(); g.arc(x, y, RR, s0, s1); g.stroke();
+    const ea = cw ? s1 : s0, ex = x + Math.cos(ea)*RR, ey = y + Math.sin(ea)*RR;
+    g.beginPath(); g.moveTo(ex + (cw ? -7 : 7), ey - 2); g.lineTo(ex + (cw ? 3 : -3), ey + 9); g.lineTo(ex + (cw ? 6 : -6), ey - 6); g.closePath(); g.fill(); };
+  const screw = (c, r, up)=>{ const x = X(c), y = Y(r), u = C*0.42; g.fillStyle = paper; g.fillRect(x - 1.4*u, y - 1.4*u, 2.8*u, 2.8*u);
+    g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 1.8;
+    g.beginPath(); g.ellipse(x, y + 0.35*u, 1.15*u, 0.75*u, 0, Math.PI, 0); g.lineTo(x + 1.15*u, y + 0.8*u); g.lineTo(x - 1.15*u, y + 0.8*u); g.closePath(); g.stroke();   // housing
+    g.fillRect(x - 0.55*u, y - 0.95*u, 1.1*u, 0.35*u); g.fillRect(x - 0.12*u, y - 0.6*u, 0.24*u, 0.6*u);                   // screw head + shank
+    g.beginPath(); g.arc(x, y + 0.35*u, 0.32*u, 0, Math.PI*2); g.fill();
+    const ax = x + 1.45*u; g.beginPath(); g.moveTo(ax, y + 0.8*u); g.lineTo(ax, y - 0.7*u); g.stroke();
+    g.beginPath(); g.moveTo(ax, y + (up ? -1.05 : 1.05)*u); g.lineTo(ax - 0.28*u, y + (up ? -0.6 : 0.6)*u); g.lineTo(ax + 0.28*u, y + (up ? -0.6 : 0.6)*u); g.closePath(); g.fill(); };
+  drum(-7, 15.3, true); drum(6.8, 15.3, false); drum(-7.6, -15.7, true); drum(6.8, -15.7, false);
+  screw(-12.4, 8.3, true); screw(12.2, 8.0, true); screw(-12.4, -7.0, true); screw(12.2, -7.0, true);
+  g.font = `22px ${KO}`;
+  [['가늠자돌림쇠', -7, 13.8], ['가늠자돌림쇠', 7.2, 13.7], ['가늠자돌림쇠', -8.2, -14.3], ['가늠자돌림쇠', 7.4, -14.3],
+   ['가늠자상하조정나사', -8.8, 6.6], ['가늠자상하조정나사', 9.3, 6.0], ['가늠자상하조정나사', -9.4, -8.6], ['가늠자상하조정나사', 9.6, -8.6],
+   ['가늠자상하조정쇠 "2.5" 사용', -0.8, -14.3]].forEach(([t, c, r])=>{ g.fillStyle = paper; const w = g.measureText(t).width + 8; g.fillRect(X(c) - w/2, Y(r) - 13, w, 26); g.fillStyle = ink; g.fillText(t, X(c), Y(r)); });
   // instructions under the grid
-  g.textAlign = 'left'; g.font = `24px ${KO}`;
-  g.fillText('○ 수직선 0을 기준 : 좌탄시 가늠자돌림쇠를 우로, 우탄시 좌로 돌려 조정', 70, Y(-15) + 70);
-  g.fillText('○ 수평선 0을 기준 : 상탄시 가늠자 상·하 조정나사를 좌로, 하탄시 우로 돌려 조정', 70, Y(-15) + 108);
+  g.textAlign = 'left'; g.font = `21px ${KO}`;
+  g.fillText('○ 수직선 0을 기준 : 좌탄시 가늠자돌림쇠를 우로, 우탄시 좌로 돌려 조정', X(-13) - 10, Y(-17) + 52);
+  g.fillText('○ 수평선 0을 기준 : 상탄시 가늠자 상·하 조정나사를 좌로, 하탄시 우로 돌려 조정', X(-13) - 10, Y(-17) + 84);
   g.textAlign = 'center';
 }
 
@@ -1598,7 +1605,7 @@ function shootTarget(){
   g.fillStyle = '#121212'; g.beginPath(); g.arc(u, v, 6.5, 0, Math.PI*2); g.fill();
   targetTex.needsUpdate = true;
   // offset from the zero point in grid cells → which way to adjust (as printed on the sheet)
-  const dx = (u - TCV.X0)/TCV.CELL, dy = (TCV.Y0 - v)/TCV.CELL, inside = Math.hypot(dx, dy) <= 1.75;
+  const dx = (u - TCV.X0)/TCV.CELL, dy = (TCV.Y0 - v)/TCV.CELL, inside = Math.hypot(dx, dy) <= ZERO_R;
   if (inside){ S.hits++; popScore('원 안 명중'); }
   else popScore(`${dx < 0 ? '좌' : '우'} ${Math.abs(dx).toFixed(1)} · ${dy > 0 ? '상' : '하'} ${Math.abs(dy).toFixed(1)}칸`);
   // 3-round group: its centre tells how many clicks to put on (sheet: 좌탄 → 돌림쇠 우로, 상탄 → 상하조정나사 좌로)
