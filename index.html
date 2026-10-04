@@ -70,9 +70,13 @@
   #hud, #status, #viewSeg, #dock, #fire, #hint, #pop { z-index:2; }
   #peep { position:fixed; inset:0; pointer-events:none; display:none; z-index:1;
           background: radial-gradient(circle at 50% 50%, transparent 0, transparent 21vmin, rgba(18,20,24,.55) 25vmin, rgba(12,13,16,.94) 31vmin); }
-  body.range #peep { display:block; }
+  body.range #peep { display:none; }   /* (user) no dark tunnel round the sights */
   #pop { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); font-size:40px; font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.45); opacity:0; pointer-events:none; }
   #pop.go { animation:pop .8s ease-out; }
+  #rangeMsg { position:fixed; left:50%; top:66%; transform:translate(-50%, 8px); z-index:3; padding:12px 22px; border-radius:var(--r); font-size:18px; font-weight:750;
+              color:var(--warn); pointer-events:none; opacity:0; transition:opacity .2s, transform .2s; max-width:calc(100vw - 40px); text-align:center; }
+  #rangeMsg.on { opacity:1; transform:translate(-50%, 0); }
+  body:not(.range) #rangeMsg { display:none; }
   /* press-and-hold progress (stock fold) */
   #holdRing { position:fixed; z-index:3; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%; pointer-events:none; --p:0%;
               background:conic-gradient(var(--accent) var(--p), rgba(255,255,255,.55) 0); box-shadow:var(--shadow); display:grid; place-items:center; }
@@ -167,6 +171,7 @@
 
 <div id="peep"></div>
 <div id="pop"></div>
+<div id="rangeMsg" class="glass"></div>
 <div id="holdRing" hidden><span>꾹</span></div>
 <div id="viewSeg" class="glass"><button data-v="inspect" class="on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>점검</button><button data-v="range"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>사격장</button></div>
 <div id="dock" class="glass">
@@ -320,6 +325,18 @@ function taperZ(mesh, depth, f){
   const p = mesh.geometry.attributes.position;
   for (let i=0;i<p.count;i++){ const z = p.getZ(i) - depth/2; p.setZ(i, z*f(p.getX(i), p.getY(i)) + depth/2); }
   p.needsUpdate = true; mesh.geometry.computeVertexNormals(); return mesh;
+}
+// a loop of round wire through the given corner points (x, y), corners rounded with radius rc, lying in the XY plane
+function wireLoop(pts, rc, wire, mat){
+  const path = new THREE.CurvePath(), n = pts.length, v = i=>new THREE.Vector2(...pts[(i + n)%n]);
+  for (let i=0;i<n;i++){
+    const a = v(i - 1), b = v(i), c = v(i + 1), ab = b.clone().sub(a).normalize(), bc = c.clone().sub(b).normalize();
+    const p0 = b.clone().addScaledVector(ab, -rc), p1 = b.clone().addScaledVector(bc, rc);
+    const q0 = v(i + 1).addScaledVector(bc, -rc);                                     // end of the straight run before the next corner
+    path.add(new THREE.QuadraticBezierCurve3(new THREE.Vector3(p0.x, p0.y, 0), new THREE.Vector3(b.x, b.y, 0), new THREE.Vector3(p1.x, p1.y, 0)));
+    path.add(new THREE.LineCurve3(new THREE.Vector3(p1.x, p1.y, 0), new THREE.Vector3(q0.x, q0.y, 0)));
+  }
+  return shadowed(new THREE.Mesh(new THREE.TubeGeometry(path, 120, wire, 10, true), mat));
 }
 function shape(pts){ const s = new THREE.Shape(); s.moveTo(...pts[0]); pts.slice(1).forEach(p=>p.length === 4 ? s.quadraticCurveTo(...p) : s.lineTo(...p)); return s; }
 function spring(pos, vel, target, k, c, dt){ const a = -k*(pos-target) - c*vel; vel += a*dt; pos += vel*dt; return [pos, vel]; }
@@ -602,24 +619,27 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const SX = -0.63, SY = -0.03, LZ = -0.27;            // LZ: left face of the lower receiver
   const sel = new THREE.Group(); sel.position.set(SX, SY, LZ); rec.add(sel); parts.selector = sel;
   const lever = new THREE.Shape();
-  lever.moveTo(0.085, 0); lever.quadraticCurveTo(0.0, 0.07, -0.11, 0.075);
-  lever.absarc(-0.11, 0, 0.075, Math.PI/2, Math.PI*1.5, false);
-  lever.quadraticCurveTo(0.0, -0.07, 0.085, 0);
-  const selPlate = extrude(lever, 0.012, M.dsteel, 0.006); selPlate.position.z = -0.018; sel.add(selPlate);
-  at(sel, cylZ(0.042, 0.05, M.dsteel, 28), -0.13, 0, -0.045);                        // thumb knob
-  at(sel, shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.042, 24, 12, 0, Math.PI*2, 0, Math.PI/2), M.dsteel)), -0.13, 0, -0.07).rotation.x = -Math.PI/2;
+  // (close-up photo) a flat teardrop plate: a short pointed tip with a little nub at the mark, slim straight-ish sides,
+  // a round end carrying a tall cylindrical thumb knob with a gently domed top
+  lever.moveTo(0.072, 0.012); lever.quadraticCurveTo(-0.02, 0.062, -0.15, 0.058);
+  lever.absarc(-0.15, 0, 0.058, Math.PI/2, Math.PI*1.5, false);
+  lever.quadraticCurveTo(-0.02, -0.062, 0.072, -0.012); lever.lineTo(0.088, -0.005); lever.lineTo(0.088, 0.005); lever.lineTo(0.072, 0.012);
+  const selPlate = extrude(lever, 0.01, M.dsteel, 0.005); selPlate.position.z = -0.016; sel.add(selPlate);
+  at(sel, cylZ(0.045, 0.06, M.dsteel, 32), -0.15, 0, -0.05);                         // thumb knob
+  { const dome = at(sel, shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.045, 32, 10, 0, Math.PI*2, 0, Math.PI/2), M.dsteel)), -0.15, 0, -0.08); dome.rotation.x = -Math.PI/2; dome.scale.y = 0.35; }
+  { const rim = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.004, 6, 32), M.dsteel); at(sel, rim, -0.15, 0, -0.08); }
   at(sel, cylZ(0.018, 0.012, M.steel, 16), 0, 0, -0.026);                            // pivot screw
   // +z rotation is clockwise as seen from the left, so each step is a quarter turn further
   parts.SEL_ANG = [0, Math.PI*0.5, Math.PI, Math.PI*1.5];
   // markings engraved into the receiver around the lever
-  const SZ = 0.42, SR = 0.115;
+  const SZ = 0.46, SR = 0.122;
   const selMark = engraved(g=>{
-    g.font = 'bold 34px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    [['안 전', 0], ['단 발', 1], ['연 발', 2], ['점 사', 3]].forEach(([t, i])=>{
+    g.font = 'bold 36px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    [['안전', 0], ['단발', 1], ['연발', 2], ['점사', 3]].forEach(([t, i])=>{
       const a = parts.SEL_ANG[i];
       g.fillText(t, 256 - Math.cos(a)*SR/SZ*512, 256 - Math.sin(a)*SR/SZ*512);   // canvas x runs toward the stock (seen from the left)
     });
-  }, 512, 512, SZ, SZ, true);
+  }, 512, 512, SZ, SZ, true, 'rgba(196,198,192,.9)');   // (photo) the marks are filled with worn white paint
   selMark.position.set(SX, SY, LZ - 0.0015); rec.add(selMark); parts.portCover.push(selMark);   // hidden in clear view with the receiver skin
   // left side of the lower: model / calibre marking ahead of the bolt catch
   const roll = engraved(g=>{
@@ -642,12 +662,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // rear sling loop (photo): swivel block at the back of the lower on the left, big D-loop hanging from it
   at(rec, rbox(0.13, 0.13, 0.05, 0.02, M.gun), -1.17, 0.02, LZ - 0.02);                  // swivel boss
   at(rec, cylZ(0.03, 0.07, M.dsteel, 14), -1.17, 0.02, LZ - 0.05); at(rec, box(0.04, 0.007, 0.004, M.black), -1.17, 0.02, LZ - 0.086).rotation.z = 0.7;   // swivel rivet
-  const loopS = new THREE.Shape(); loopS.moveTo(-0.04, 0.03); loopS.quadraticCurveTo(0, 0.06, 0.04, 0.03); loopS.lineTo(0.15, -0.17); loopS.quadraticCurveTo(0.17, -0.22, 0.12, -0.22);
-  loopS.lineTo(-0.12, -0.22); loopS.quadraticCurveTo(-0.17, -0.22, -0.15, -0.17); loopS.lineTo(-0.04, 0.03);
-  const loopH = new THREE.Path(); loopH.moveTo(-0.02, 0.0); loopH.lineTo(-0.12, -0.175); loopH.quadraticCurveTo(-0.13, -0.195, -0.11, -0.195); loopH.lineTo(0.11, -0.195);
-  loopH.quadraticCurveTo(0.13, -0.195, 0.12, -0.175); loopH.lineTo(0.02, 0.0); loopH.lineTo(-0.02, 0.0);
-  loopS.holes.push(loopH);
-  const rloop = extrude(loopS, 0.016, M.dsteel, 0.006); rloop.position.set(-1.17, 0.02, LZ - 0.09); rec.add(rloop);
+  at(rec, cylY(0.022, 0.05, M.dsteel, 12), -1.17, -0.035, LZ - 0.075);                     // swivel eye under the boss
+  { const lp = wireLoop([[-0.05, -0.06], [0.05, -0.06], [0.15, -0.188], [-0.15, -0.188]], 0.04, 0.014, M.dsteel); lp.position.set(-1.17, 0, LZ - 0.082); rec.add(lp); }
   // --- sling (멜빵, 분해도 ①): olive cotton webbing between the two loops, snap hooks at both ends, a slide buckle ---
   { const sl = new THREE.Group(); rec.add(sl); parts.sling = sl;
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
@@ -735,7 +751,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // surface features: grooves pressed into each side (the whole wall dents), and 4 large oval vents on top that sit on the
   // seam, so each half carries one half of every vent
   const feats = [], HOLE_IN = 0.82;
-  [0, Math.PI].forEach(side=>[-0.42, -0.14, 0.14, 0.42].forEach(t=>feats.push({ t:side + t, x0:1.55, x1:2.83, w:0.036, dp:0.018 })));
+  [0, Math.PI].forEach(side=>[-0.45, -0.15, 0.15, 0.45].forEach(t=>feats.push({ t:side + t, x0:1.47, x1:2.93, w:0.047, dp:0.022 })));
   [1.66, 2.04, 2.42, 2.8].forEach(x=>feats.push({ t:Math.PI/2, x0:x - 0.04, x1:x + 0.04, w:0.13, hole:true }));
   feats.forEach(f=>{ f.sp = secPt(f.t + 0.003).sub(secPt(f.t - 0.003)).length()/0.006; });
   const hgMat = M.poly.clone(); hgMat.vertexColors = true; hgMat.side = THREE.DoubleSide; SHELL.push([hgMat, 0.14]);
@@ -811,6 +827,12 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     if (sd > 0){ at(half, cylY(0.03, 0.02, M.dsteel, 16), 3.42, HGY + 0.333, 0); at(half, box(0.045, 0.006, 0.008, M.black), 3.42, HGY + 0.344, 0); }   // screw on top of the collar
     { const lb = tagSprite('덮개'); lb.position.set(2.2, HGY + 0.48, sd*0.3); half.add(lb); parts.labels1.push(lb); }
     if (sd > 0){ const lb = tagSprite('덮개나사'); lb.position.set(3.45, HGY + 0.55, 0.32); half.add(lb); parts.labels1.push(lb); }
+    // alignment tabs along both seams (photo, inside view): tabs on the right half, slots on the left
+    [1.55, 1.95, 2.35, 2.75].forEach(x=>[1, -1].forEach(up=>{
+      const y = HGY + up*(HB - THK - 0.03);
+      if (sd > 0){ const tb = at(half, box(0.07, 0.04, 0.05, M.poly), x, y, -0.012); const hole = at(half, cylZ(0.009, 0.052, M.black, 8), x, y, -0.012); }
+      else at(half, box(0.075, 0.045, 0.004, M.black), x, y, -0.003);
+    }));
     parts.hgHalves.push({ g:half, sd });
   });
   at(rec, cylX(0.068, 1.4, M.gunDark, 18), 4.3, 0.64, 0);                // gas tube (outside)
@@ -832,7 +854,9 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // gas block: wraps round the barrel (a bore-sized hole through it, not a solid block across the bore)
   { const gb = new THREE.Shape(); gb.moveTo(-0.13, 0.28); gb.lineTo(0.13, 0.28); gb.lineTo(0.13, 0.72); gb.lineTo(-0.13, 0.72); gb.closePath();
     const h = new THREE.Path(); h.absarc(0, BORE, 0.081, 0, Math.PI*2, true); gb.holes.push(h);
-    const m = extrude(gb, 0.3, M.gunDark, 0.02); m.rotation.y = Math.PI/2; m.position.x = 4.82; rec.add(m); }
+    const m = extrude(gb, 0.3, M.gunDark, 0.02); m.rotation.y = Math.PI/2; m.position.x = 4.82; rec.add(m);
+    [1, -1].forEach(sd=>[0.6, 0.68].forEach(y=>{ at(rec, cylZ(0.016, 0.01, M.dsteel, 12), 5.02, y, sd*0.154); }));   // cross pins (photo: two on the side)
+    const st = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.008, 8, 28), M.gunDark); st.rotation.y = Math.PI/2; at(rec, st, 4.79, 0.64, 0); }
   // front sight + gas regulator (close-up photos, DR200 manual Fig. 5). The sight is one flat-fronted "keyhole" piece on
   // the front of the gas block: thick ring on top, neck tapering down to a boss round the regulator, a yellow arrow painted
   // on its face pointing down at the regulator. The post is a blade standing in a notch at the bottom of the ring.
@@ -872,18 +896,15 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(detent, cylZ(0.028, 0.05, M.gunDark, 20), 0, 0, 0.02);
   const dFace = new THREE.Mesh(new THREE.CircleGeometry(0.026, 20), new THREE.MeshStandardMaterial({ color:0x3a3d40, roughness:0.6, metalness:0.6, bumpMap:gripBump, bumpScale:0.01 })); at(detent, dFace, 0, 0, 0.0455);
   tag(gas, 'gas'); tag(detent, 'gas');
-  // front sling swivel (photo): band clamped round the barrel, lug under it, D-ring hanging from the swivel pin
-  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.081,-0.04],[0.1,-0.04],[0.1,0.04],[0.081,0.04],[0.081,-0.04]].map(([r, y])=>new THREE.Vector2(r, y)), 24), M.gunDark)), 4.62, BORE, 0).rotation.z = Math.PI/2;   // band round the barrel
-  at(rec, rbox(0.08, 0.08, 0.07, 0.015, M.gunDark), 4.62, 0.26, 0);
-  at(rec, cylZ(0.015, 0.1, M.steel, 10), 4.62, 0.24, 0);
-  at(rec, cylZ(0.024, 0.014, M.dsteel, 16), 4.62, 0.275, 0.042); at(rec, box(0.036, 0.006, 0.004, M.black), 4.62, 0.275, 0.05).rotation.z = 0.5;   // clamp screw
-  // (photo) the sling loop is a rounded trapezoid, widening downward; the band's lug carries a slotted clamp screw
-  const dring = new THREE.Shape(); dring.moveTo(-0.07, 0.02); dring.quadraticCurveTo(0, 0.05, 0.07, 0.02); dring.lineTo(0.15, -0.13); dring.quadraticCurveTo(0.17, -0.17, 0.13, -0.17);
-  dring.lineTo(-0.13, -0.17); dring.quadraticCurveTo(-0.17, -0.17, -0.15, -0.13); dring.lineTo(-0.045, 0.02);
-  const dpath = new THREE.Path(); dpath.moveTo(-0.045, -0.012); dpath.lineTo(-0.122, -0.132); dpath.quadraticCurveTo(-0.13, -0.146, -0.112, -0.146);
-  dpath.lineTo(0.112, -0.146); dpath.quadraticCurveTo(0.13, -0.146, 0.122, -0.132); dpath.lineTo(0.045, -0.012); dpath.lineTo(-0.045, -0.012);
-  dring.holes.push(dpath);
-  const dr = extrude(dring, 0.02, M.dsteel, 0.006); dr.position.set(4.62, 0.24, -0.01); rec.add(dr);
+  // front sling swivel (close-up photo): narrow band clamped round the barrel, a thick ear under it with a hex-socket
+  // clamp screw through its side, a swivel eye, and a loop of round wire (rounded trapezoid, wider at the bottom)
+  at(rec, shadowed(new THREE.Mesh(new THREE.LatheGeometry([[0.081,-0.035],[0.098,-0.035],[0.102,-0.028],[0.102,0.028],[0.098,0.035],[0.081,0.035],[0.081,-0.035]].map(([r, y])=>new THREE.Vector2(r, y)), 32), M.gunDark)), 4.62, BORE, 0).rotation.z = Math.PI/2;   // band round the barrel
+  at(rec, rbox(0.07, 0.11, 0.09, 0.02, M.gunDark), 4.62, 0.27, 0);                          // ear (the two clamp jaws)
+  at(rec, box(0.074, 0.06, 0.006, M.black), 4.62, 0.27, 0);                                  // split between the jaws
+  at(rec, cylZ(0.026, 0.012, M.dsteel, 18), 4.62, 0.27, 0.051); at(rec, cylZ(0.011, 0.004, M.black, 6), 4.62, 0.27, 0.0575);   // hex-socket screw head
+  at(rec, cylZ(0.02, 0.012, M.dsteel, 6), 4.62, 0.27, -0.051);                               // its nut
+  at(rec, cylY(0.02, 0.04, M.dsteel, 12), 4.62, 0.205, 0);                                   // swivel eye
+  { const lp = wireLoop([[-0.045, 0.19], [0.045, 0.19], [0.13, 0.075], [-0.13, 0.075]], 0.035, 0.013, M.dsteel); rec.add(lp); lp.position.x = 4.62; }
   at(rec, box(0.3, 0.1, 0.1, M.gunDark), 5.3, 0.26, 0);
   // --- slotted flash hider: a tube, open at the front, the barrel's bore at the bottom of it ---
   M.bore = M.bore || new THREE.MeshStandardMaterial({ color:0x111213, roughness:0.6, metalness:0.6, side:THREE.BackSide });
@@ -1203,7 +1224,8 @@ let targetCanvas, targetTex, target;
   grass.rotation.x = -Math.PI/2; grass.position.y = RANGE_GROUND; range.add(grass);
   const berm = new THREE.Mesh(new THREE.BoxGeometry(30, 40, 400), new THREE.MeshStandardMaterial({ color:0x9a7b55, roughness:1 }));
   berm.position.set(TARGET_X + 40, RANGE_GROUND + 14, 0); berm.rotation.z = 0.5; range.add(berm);
-  targetCanvas = document.createElement('canvas'); targetCanvas.width = TCV.W; targetCanvas.height = TCV.H;
+  targetCanvas = document.createElement('canvas'); targetCanvas.width = TCV.W*2; targetCanvas.height = TCV.H*2;
+  targetCanvas.getContext('2d').setTransform(2, 0, 0, 2, 0, 0);   // drawn in sheet units at twice the resolution (crisp on the range)
   drawTarget();
   targetTex = new THREE.CanvasTexture(targetCanvas); targetTex.encoding = THREE.sRGBEncoding;
   targetTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -1334,7 +1356,9 @@ const S = {
   zx:(Math.random() < 0.5 ? -1 : 1)*(1.5 + Math.random()*3), zy:(Math.random() < 0.5 ? -1 : 1)*(1 + Math.random()*3), wind:0, elev:0, group:[],
 };
 let msg = '', msgT = 0;
-function say(t, dur = 2.2){ msg = t; msgT = dur; renderHud(); }
+function say(t, dur = 2.2){ msg = t; msgT = dur; renderHud(); if (view === 'range') rangeGuide(t, dur); }
+// on the range the eye is on the sights: put the guide in the middle of the screen too
+function rangeGuide(t, dur){ const g = document.getElementById('rangeMsg'); g.textContent = t; g.classList.add('on'); clearTimeout(rangeGuide.tm); rangeGuide.tm = setTimeout(()=>g.classList.remove('on'), dur*1000); }
 const canFeed = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count > 0;
 // strip the top round: it follows the bolt forward into the chamber while the column rises one step
 function feedFromMag(){
@@ -1428,11 +1452,11 @@ const EJECT_AT = 0.8;    // carrier travel at which the dragged-back case clears
 function fire(){
   if (!S.cocked) return false;
   S.cocked = false;
-  if (!S.chambered){ SND.click(); S.burst = 0; say('딸깍 — 약실이 비었어요'); return false; }
+  if (!S.chambered){ SND.click(); S.burst = 0; say(S.mag && S.attached && S.mag.count > 0 ? '딸깍 — 약실이 비었어요 · 노리쇠를 당기세요 (F)' : '딸깍 — 탄이 없어요 · 새 탄창 (N) 후 노리쇠 (F)'); return false; }
   S.chambered = false; S.spent = true;          // the fired case stays in the chamber until the bolt pulls it out
   SND.shot(); S.flash = 0.05;
   const hot = S.gas === 3;
-  S.kickV += GAS_KICK[S.gas]; S.riseV += (S.fold > 0.5 ? 5 : 3.2) * (hot ? 1.15 : 1);
+  S.kickV += GAS_KICK[S.gas]*1.7; S.riseV += (S.fold > 0.5 ? 8.5 : 6) * (hot ? 1.15 : 1);   // a sharp shove back and the muzzle climbing
   const rate = GAS_RATE[S.gas];
   if (S.gas === 0){
     // gas shut off: nothing drives the carrier, the empty case stays in the chamber
@@ -1560,7 +1584,7 @@ function shootTarget(){
   const dir = tmpB.set(1, 0, 0).applyQuaternion(aim.getWorldQuaternion(new THREE.Quaternion()));
   const spread = 0.0012 + Math.min(0.012, S.streak*0.0018);
   dir.add(new THREE.Vector3(0, (Math.random()-0.5)*2*spread, (Math.random()-0.5)*2*spread)).normalize();
-  aimKick += 0.01 + (S.fold > 0.5 ? 0.006 : 0);
+  aimKick += 0.022 + (S.fold > 0.5 ? 0.01 : 0); aimYawT += (Math.random() - 0.5)*0.008; camShake = 1;   // muzzle climb, a little sideways, and the shoulder jolt
   if (Math.abs(dir.x) < 1e-4) return;
   const t = (TARGET_X - tmpA.x) / dir.x; if (t <= 0) return;
   const lp = target.worldToLocal(tmpA.clone().addScaledVector(dir, t));
@@ -1607,7 +1631,7 @@ const popEl = document.getElementById('pop'), holdRing = document.getElementById
 function popScore(t){ popEl.textContent = t; popEl.classList.remove('go'); void popEl.offsetWidth; popEl.classList.add('go'); renderHud(); }
 
 // ---------- views ----------
-let view = 'inspect', aimYaw = 0, aimPitch = 0, aimYawT = 0, aimPitchT = 0, aimKick = 0;
+let view = 'inspect', aimYaw = 0, aimPitch = 0, aimYawT = 0, aimPitchT = 0, aimKick = 0, camShake = 0;
 const aspect = () => (camera.aspect > 0 && isFinite(camera.aspect)) ? camera.aspect : 1.6;
 function inspectCamera(){
   // fit the whole rifle (≈ 11.5 units long) whatever the screen shape
@@ -1961,7 +1985,7 @@ function animate(){
 
   // recoil + muzzle flash
   for (let i=0;i<4;i++){ [S.kick, S.kickV] = spring(S.kick, S.kickV, 0, 900, 30, dt/4); [S.rise, S.riseV] = spring(S.rise, S.riseV, 0, 500, 24, dt/4); }
-  rec.position.x = -S.kick*0.06; rec.rotation.z = S.rise*0.02;
+  rec.position.x = -S.kick*0.075; rec.rotation.z = S.rise*0.026;
   S.flash -= dt;
   const on = S.flash > 0;
   M.flash.opacity = on ? (view === 'range' ? 0.45 : 0.9) : 0; parts.flashLight.intensity = on ? 4 : 0;
@@ -1971,10 +1995,11 @@ function animate(){
     holder.position.y = Math.sin(t*1.1)*0.1;
     holder.rotation.y = Math.sin(t*0.4)*0.04;
   } else {
-    aimKick *= Math.pow(0.02, dt);
+    aimKick *= Math.pow(0.05, dt); camShake *= Math.pow(0.0005, dt);
     aimYaw += (aimYawT - aimYaw) * Math.min(1, dt*10);
     aimPitch += (aimPitchT - aimPitch) * Math.min(1, dt*10);
-    aim.rotation.set(0, aimYaw + Math.sin(t*0.9)*0.002, aimPitch + aimKick + Math.sin(t*1.3)*0.0025);
+    aim.rotation.set((Math.random() - 0.5)*0.01*camShake, aimYaw + Math.sin(t*0.9)*0.002 + (Math.random() - 0.5)*0.004*camShake, aimPitch + aimKick + Math.sin(t*1.3)*0.0025);
+    camera.position.x = -0.06*camShake;   // the stock punches into the shoulder
   }
   updateCasings(dt);
   if (msgT > 0) msgT -= dt;
