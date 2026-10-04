@@ -444,7 +444,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // edge vertices can be snapped onto the outline (smooth rounded edges, no stair-steps).
   const sdRR = (x, y, x0, x1, y0, y1, r)=>{ const qx = Math.abs(x - (x0 + x1)/2) - ((x1 - x0)/2 - r), qy = Math.abs(y - (y0 + y1)/2) - ((y1 - y0)/2 - r);
     return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
-  const sdPort = (x, y)=>Math.min(sdRR(x, y, 0.15, 1.16, 0.33, 0.53, 0.05), sdRR(x, y, -0.84, 0.3, 0.405, 0.455, 0.02), sdRR(x, y, -0.92, -0.76, 0.385, 0.485, 0.045));
+  const sdPort = (x, y)=>Math.min(sdRR(x, y, -0.06, 1.06, 0.33, 0.58, 0.05), sdRR(x, y, -0.84, 0.0, 0.365, 0.415, 0.02), sdRR(x, y, -0.86, -0.72, 0.34, 0.44, 0.045));   // (photo) port, slot, keyhole
   const inPort = (x, y)=>sdPort(x, y) < 0;
   { const NX = 330, NT = 420, pos = [], col = [], idx = [], cut = [], NV = (NX + 1)*(NT + 1);
     // each ring is resampled evenly by arc length (a squarish superellipse bunches its points at the corners, which
@@ -501,18 +501,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // (photos) the aperture sits low on a small base between the walls, its leaves hung on a cross pin running wall to wall
   // (reference renders) the aperture rides on a windage screw running wall to wall: a low base block on the channel
   // floor, the threaded screw through it, and a slider carrying the leaves' pivot, with a white scale on its back
-  at(rs, rbox(0.2, 0.045, 0.2, 0.01, M.gunDark), -0.8, 0.795, 0);                         // base on the channel floor
-  at(rs, cylZ(0.02, 0.5, M.dsteel, 14), -0.8, 0.835, 0);                                   // windage screw, wall to wall
-  for (let k=-9;k<=9;k++) if (Math.abs(k) > 2){ const t = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0035, 5, 14), M.steel); at(rs, t, -0.8, 0.835, k*0.024); }   // its threads
-  at(rs, rbox(0.1, 0.075, 0.11, 0.012, M.gunDark), -0.8, 0.84, 0);                         // slider, just tall enough to carry the pivot
-  at(rs, rbox(0.04, 0.03, 0.13, 0.008, M.gunDark), -0.8, 0.868, 0);                       // pivot knuckles
+  at(rs, rbox(0.2, 0.045, 0.2, 0.01, M.gunDark), -0.7, 0.795, 0);                         // base on the channel floor
+  at(rs, cylZ(0.02, 0.5, M.dsteel, 14), -0.7, 0.835, 0);                                   // windage screw, wall to wall
+  for (let k=-9;k<=9;k++) if (Math.abs(k) > 2){ const t = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.0035, 5, 14), M.steel); at(rs, t, -0.7, 0.835, k*0.024); }   // its threads
+  at(rs, rbox(0.1, 0.075, 0.11, 0.012, M.gunDark), -0.7, 0.84, 0);                         // slider, just tall enough to carry the pivot
+  at(rs, rbox(0.04, 0.03, 0.13, 0.008, M.gunDark), -0.7, 0.868, 0);                       // pivot knuckles
   // 가늠자 상하조정나사: slotted screw standing in the base ahead of the slider (zeroing, up/down)
-  const elev = new THREE.Group(); elev.position.set(-0.725, 0.83, 0); rs.add(elev); parts.elevScrew = elev;
+  const elev = new THREE.Group(); elev.position.set(-0.625, 0.83, 0); rs.add(elev); parts.elevScrew = elev;
   at(elev, cylY(0.024, 0.03, M.dsteel, 18), 0, 0, 0); at(elev, box(0.04, 0.008, 0.007, M.black), 0, 0.016, 0);
   tag(elev, 'zeroE');
   { const sc = engraved(g=>{ g.fillRect(8, 30, 112, 3); for (let i=0;i<=8;i++){ const x = 8 + i*14; g.fillRect(x - 1, i % 4 ? 18 : 8, 3, i % 4 ? 12 : 22); } g.fillRect(60, 36, 8, 14); },
       128, 56, 0.1, 0.044, false, 'rgba(236,236,230,.95)');
-    sc.rotation.y = -Math.PI/2; sc.position.set(-0.8505, 0.83, 0); rs.add(sc); }                // windage scale on the slider's back
+    sc.rotation.y = -Math.PI/2; sc.position.set(-0.7505, 0.83, 0); rs.add(sc); }                // windage scale on the slider's back
   // windage drum, right side (photo): set in a counterbore, worn steel face with four spanner holes, a small index
   // hole below the centre and a stud with a lock nut in the middle; "R —" stamped below it
   const drumM = new THREE.MeshStandardMaterial({ color:0x5f5a4e, map:parkMap, roughness:0.42, metalness:0.82, envMapIntensity:1.0 });
@@ -547,7 +547,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
     mk.position.set(DX + 0.02, DY - 0.16, 0.2812); rs.add(mk); }
   // L-shaped flip aperture on a cross pin between the walls: two leaves at 90°, each a plate with a real peep hole.
   // S.flip 0 = small aperture upright (normal), 1 = flipped over onto the large aperture (short range / low light)
-  const flip = new THREE.Group(); flip.position.set(-0.8, 0.875, 0); rs.add(flip); parts.flip = flip;
+  const flip = new THREE.Group(); flip.position.set(-0.7, 0.875, 0); rs.add(flip); parts.flip = flip;   // (photo) the leaves stand further forward between the walls
   // each leaf (photo ①): square below, a round dome on top, and a big round peep hole in the middle of the dome
   const leaf = hole=>{ const R = 0.074, hc = SIGHT_Y - 0.875, sh = new THREE.Shape();
     sh.moveTo(-R, 0); sh.lineTo(R, 0); sh.lineTo(R, hc); sh.absarc(0, hc, R, 0, Math.PI, false); sh.lineTo(-R, 0);
@@ -563,7 +563,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   tag(flip, 'rearsight');
   // night sight (photos): a second, open leaf with a big ring lying folded forward in front of the aperture; flipped up
   // (Y) it stands in the sight line for low light
-  const night = new THREE.Group(); night.position.set(-0.6, 0.8, 0); rs.add(night); parts.nightSight = night;
+  const night = new THREE.Group(); night.position.set(-0.52, 0.8, 0); rs.add(night); parts.nightSight = night;
   { const R = 0.075, hc = SIGHT_Y - 0.8, sh = new THREE.Shape();
     sh.moveTo(-0.06, 0); sh.lineTo(0.06, 0); sh.lineTo(0.06, hc - 0.02); sh.absarc(0, hc, R, -0.6, Math.PI + 0.6, false); sh.lineTo(-0.06, 0);
     const ho = new THREE.Path(); ho.absarc(0, hc, 0.05, 0, Math.PI*2, true); sh.holes.push(ho);
@@ -1040,22 +1040,18 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(rod, cylX(0.058, 0.16, M.oprod, 20), 2.87, 0, 0);                               // piston head
   [2.82, 2.87, 2.92].forEach(x=>{ const r = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 20), M.black); r.rotation.y = Math.PI/2; at(rod, r, x, 0, 0); });
   // charging handle (close-up photo): fixed to the carrier, flat L-shaped slide plate in the slot, round knob with a hollow end
-  // charging handle (close-up photo, bolt held open): a long flat slide plate running in the thin slot, its front end
-  // stepping up ("ㄱ") into the port where it hooks onto the front of the carrier; the spool knob sits a third of the way
-  // back on the plate. Origin = the step at the carrier's front.
-  const handle = piece('장전손잡이', 1.08, 0.43, 0.3, [0, 0, 0], [-0.4, -0.3, 0.2], carrier, 1);
-  const KX = -0.4;                                                                     // knob, behind the step
-  at(handle, rbox(0.85, 0.042, 0.022, 0.008, M.gunDark), -0.42, 0, -0.03);             // slide plate, flush in the slot
-  at(handle, rbox(0.06, 0.1, 0.022, 0.008, M.gunDark), 0.0, 0.03, -0.03);              // the step rising into the port
-  at(handle, rbox(0.06, 0.06, 0.14, 0.01, M.gunDark), 0.0, 0.05, -0.12);               // hook into the carrier
-  at(handle, cylZ(0.032, 0.09, M.gunDark, 20), KX, 0, 0.0);                            // knob stem off the plate
-  // knob (photos): spool — flange, slim waist with a cross-pin hole, wide rounded rim hollowed into a cup
-  const knobPts = [[0.0,0.04],[0.066,0.04],[0.072,0.048],[0.072,0.07],[0.06,0.08],[0.048,0.09],[0.046,0.13],[0.06,0.143],[0.075,0.155],
-    [0.078,0.17],[0.074,0.185],[0.062,0.19],[0.05,0.185],[0.04,0.17],[0.02,0.162],[0.0,0.16]].map(([r, z])=>[r*1.25, z]);
+  // charging handle (photos): knob on a short round stem fixed to the carrier. Placed from the held-open photo: with the
+  // carrier fully back (travel 1.0) the knob sits at x -0.25, in the thin slot a little behind the port - so x 0.75 home
+  const handle = piece('장전손잡이', 0.75, 0.39, 0.3, [0, 0, 0], [0.25, -0.3, 0.2], carrier, 1);
+  at(handle, cylZ(0.03, 0.34, M.gunDark, 20), 0, 0, -0.05);                            // round stem from the carrier straight into the knob (no gap)
+  // knob (photos): spool shape — flange against the slide plate, slim waist with a cross-pin hole, wide rounded rim at
+  // the outer end hollowed out into a cup
+  const knobPts = [[0.0,0.06],[0.066,0.06],[0.072,0.068],[0.072,0.09],[0.06,0.1],[0.048,0.11],[0.046,0.15],[0.06,0.163],[0.075,0.175],
+    [0.078,0.19],[0.074,0.205],[0.062,0.21],[0.05,0.205],[0.04,0.19],[0.02,0.182],[0.0,0.18]];
   const knob = shadowed(new THREE.Mesh(new THREE.LatheGeometry(knobPts.map(([r, z])=>new THREE.Vector2(r, z)), 36), M.gunDark));
-  knob.rotation.x = Math.PI/2; knob.position.x = KX; handle.add(knob);              // lathe axis (y) → +z, out from the receiver
-  at(handle, cylX(0.011, 0.004, M.black, 10), KX + 0.059, 0, 0.11);                   // cross-pin hole in the waist
-  at(handle, cylZ(0.014, 0.004, M.black, 10), KX, 0, 0.162);                          // small hole at the bottom of the cup
+  knob.rotation.x = Math.PI/2; handle.add(knob);                                     // lathe axis (y) → +z, out from the receiver
+  at(handle, cylX(0.009, 0.004, M.black, 10), 0.047, 0, 0.13);                        // cross-pin hole in the waist
+  at(handle, cylZ(0.012, 0.004, M.black, 10), 0, 0, 0.182);                          // small hole at the bottom of the cup
   tag(carrier, 'bcg');
   tag(shadowed(handle), 'handle');
   // recoil spring: rear supporter (also latches the upper), guide rod, and one long spring that runs into the
@@ -1081,7 +1077,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const entry = g=>parts.explode.find(p=>p.g === g);
   // laid out (photo): op rod on top, carrier below it, handle beside the carrier, spring assembly at the bottom
   entry(sp).steps = [[0, 0.08, [0.05, 0, 0]], [0.28, 0.5, [-3.3, 0, 0]], [0.5, 0.62, [3.4, 0.55, 0.5]]];
-  entry(handle).steps = [[0.45, 0.53, [-1.52, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.48, 1.2, 0.6]],   // knob to the keyhole, out sideways
+  entry(handle).steps = [[0.45, 0.53, [-1.54, 0, 0]], [0.53, 0.6, [0, 0, 0.5]], [0.6, 0.7, [2.83, 1.2, 0.6]],   // knob to the keyhole, out sideways
     [0.62, 0.86, [6.3, 0, 0]], [0.86, 1, [-6.4, -1.3, -0.2]]];        // the last two cancel the carrier's own move: the handle is already out
   entry(rod).steps = [[0.9, 1, [0.4, 0.55, 0]]];
   // handguard (photos): comes off the barrel and is laid beside the parts, leaving the long barrel and gas tube bare
