@@ -447,7 +447,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   // (photos + user's sketch) the opening, right side: a small rounded pocket at the back (where the knob is taken off), a
   // thin neck running forward from it, and the ejection port - the neck's TOP edge runs straight on into the port's top
   // edge, the port drops down below it; the knob rides in the neck. A shallow recess (REC wide) follows the whole outline.
-  const sdHole = (x, y)=>Math.min(sdRR(x, y, -0.71, -0.48, 0.39, 0.54, 0.05), sdRR(x, y, -0.5, 0.1, 0.434, 0.48, 0.02), sdRR(x, y, 0.02, 1.06, 0.27, 0.48, 0.045));
+  const sdHole = (x, y)=>Math.min(sdRR(x, y, -0.71, -0.48, 0.39, 0.54, 0.05), sdRR(x, y, -0.5, 0.1, 0.434, 0.48, 0.02), sdRR(x, y, 0.02, 1.06, 0.3, 0.48, 0.045));
   const REC = 0.03;
   const sdPort = (x, y)=>sdHole(x, y) - REC;                                         // the outer skin is cut to the recess outline
   const inPort = (x, y)=>sdPort(x, y) < 0;
@@ -508,8 +508,8 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
       const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(fp, 3)); fg.setAttribute('color', new THREE.Float32BufferAttribute(fc, 3)); fg.setIndex(fi); fg.computeVertexNormals();
       const floor = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ color:0x55585d, map:parkMap, roughness:0.45, metalness:0.75, vertexColors:true, side:THREE.DoubleSide }));
       floor.receiveShadow = true; rec.add(floor); parts.portCover.push(floor);
-      const liner = at(rec, box(0.78, 0.2, 0.01, M.black), -0.37, 0.465, 0.15); parts.portCover.push(liner);
-      parts.portCover.push(at(rec, box(0.17, 0.23, 0.01, M.black), 0.085, 0.375, 0.15)); }   // and behind the rear end of the port
+      const liner = at(rec, box(0.78, 0.2, 0.01, M.black), -0.37, 0.465, 0.16); parts.portCover.push(liner);
+      parts.portCover.push(at(rec, box(0.17, 0.2, 0.01, M.black), 0.085, 0.39, 0.16)); }   // and behind the rear end of the port
     // front wall of the receiver: the section outline with holes for the barrel extension and the operating rod
     const fc = uSec(UX1), fs = new THREE.Shape();
     for (let i=0;i<=96;i++){ const p = uPt(UX1, i/96*Math.PI*2, fc); i ? fs.lineTo(-p.z, p.y) : fs.moveTo(-p.z, p.y); }
@@ -979,7 +979,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   const body = piece('노리쇠뭉치', 0.62, BORE, 0, [0, 0, 0], [0, 0.34, 0], carrier, 1);
   // (photos) a true round AR-type carrier, ~24 mm across: R 0.128 over the front 2/3, a slimmer tail; its underside is
   // flattened a little where it rides over the top round in the magazine
-  const CR = 0.128, CT = 0.112, CFLAT = -0.1;
+  const CR = 0.15, CT = 0.112, CFLAT = -0.1;   // (user) a fuller carrier: its side fills the port so the rounds below don't show
   { const R0 = CR - 0.008, th = Math.asin((CFLAT + 0.008)/R0), sh = new THREE.Shape(), N = 48;   // the bevel adds 0.008 all round
     for (let i=0;i<=N;i++){ const a = th + (Math.PI - 2*th)*i/N; i ? sh.lineTo(Math.cos(a)*R0, Math.sin(a)*R0) : sh.moveTo(Math.cos(a)*R0, Math.sin(a)*R0); }
     sh.lineTo(Math.cos(th)*R0, Math.sin(th)*R0);
@@ -1014,9 +1014,10 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(body, cylX(0.03, 0.006, M.black, 14), -0.522, 0, 0);                                 // firing-pin hole at the back
   [-0.41, -0.37].forEach(x=>{ const g = new THREE.Mesh(new THREE.TorusGeometry(CT, 0.0035, 6, 40), M.black); g.rotation.y = Math.PI/2; at(body, g, x, 0, 0); });   // turned grooves on the tail
   // top: raised lug with a cross hole ahead of the op-rod slot
-  at(body, rbox(0.12, 0.07, 0.08, 0.015, M.carrier), 0.06, 0.145, 0);
-  at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.15, 0);
-  at(body, rbox(0.12, 0.06, 0.1, 0.02, M.carrier), 0.46, 0.055, 0.125);                 // charging-handle boss at the carrier's front
+  at(body, rbox(0.12, 0.07, 0.08, 0.015, M.carrier), 0.06, 0.165, 0);
+  at(body, cylZ(0.016, 0.084, M.black, 10), 0.06, 0.17, 0);
+  at(body, rbox(0.12, 0.06, 0.03, 0.01, M.carrier), 0.46, 0.055, 0.145);                // charging-handle boss at the carrier's front
+  at(body, rbox(0.9, 0.12, 0.02, 0.01, M.carrier), 0.03, -0.09, 0.138);                // (user) right-side skirt down to y 0.23: covers the rounds below through the port
   // rotating bolt: 7 lugs + extractor at the face (x≈1.29), gas rings on the tail, cam-pin hole
   const bolt = piece('노리쇠', 1.0, BORE, 0, [1.3, -0.3, 0], [0.05, -0.2, 0]);
   at(bolt, cylX(0.04, 0.2, M.dsteel, 16), -0.32, 0, 0);                              // tail
@@ -1041,7 +1042,7 @@ function tag(obj, part){ obj.traverse(o=>o.userData.part = part); return obj; }
   at(fpin, cylX(0.036, 0.04, M.steel, 14), -0.38, 0, 0);
   at(fpin, cylX(0.008, 0.04, M.steel, 8), 0.565, 0, 0);
   // cam pin: square head riding in the track on top of the carrier, shank down through the bolt
-  const cpin = piece('노리쇠돌림못', 0.85, 0.43, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
+  const cpin = piece('노리쇠돌림못', 0.85, 0.455, 0, [0.45, 0.75, 0], [0.1, 0.22, 0]);
   at(cpin, cylY(0.026, 0.12, M.dsteel, 14), 0, 0, 0);
   at(cpin, rbox(0.07, 0.025, 0.07, 0.008, M.dsteel), 0, 0.065, 0);
   at(cpin, cylZ(0.009, 0.06, M.black, 8), 0, -0.04, 0);                    // hole the firing pin passes through
@@ -1424,7 +1425,7 @@ let msg = '', msgT = 0;
 function say(t, dur = 2.2){ msg = t; msgT = dur; renderHud(); if (view === 'range') rangeGuide(t, dur); }
 // on the range the eye is on the sights: put the guide in the middle of the screen too
 function rangeGuide(t, dur){ const g = document.getElementById('rangeMsg'); g.textContent = t; g.classList.add('on'); clearTimeout(rangeGuide.tm); rangeGuide.tm = setTimeout(()=>g.classList.remove('on'), dur*1000); }
-const canFeed = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count > 0;
+const canFeed = () => S.mag && S.attached && S.magOut < 0.02 && S.mag.count > 0 && !S.feed;   // never strip a second round while one is still on its way
 // strip the top round: it follows the bolt forward into the chamber while the column rises one step
 function feedFromMag(){
   const z = S.mag.count % 2 === 0 ? 0.05 : -0.05;              // side of the round on top right now
@@ -1494,7 +1495,7 @@ function updateCasings(dt){
 }
 // clicking a case on the floor picks it up (screen-space test: a case is tiny, so a finger-sized radius)
 function pickCasing(e){
-  let best = null, bd = e.pointerType === 'mouse' ? 18 : 30;
+  let best = null, bd = e.pointerType === 'mouse' ? 48 : 64;   // generous: clicking near a case picks it up
   const p = new THREE.Vector3();
   for (const c of casings){
     if (c.life !== undefined || c.pick !== undefined || !(c.rest || c.roll !== undefined)) continue;
@@ -1521,7 +1522,7 @@ function fire(){
   S.chambered = false; S.spent = true;          // the fired case stays in the chamber until the bolt pulls it out
   SND.shot(); S.flash = 0.05;
   const hot = S.gas === 3;
-  S.kickV += GAS_KICK[S.gas]*1.7; S.riseV += (S.fold > 0.5 ? 8.5 : 6) * (hot ? 1.15 : 1);   // a sharp shove back and the muzzle climbing
+  S.kickV += GAS_KICK[S.gas]*2.4; S.riseV += (S.fold > 0.5 ? 11 : 8) * (hot ? 1.15 : 1);   // a sharp shove back and the muzzle climbing
   const rate = GAS_RATE[S.gas];
   if (S.gas === 0){
     // gas shut off: nothing drives the carrier, the empty case stays in the chamber
@@ -1649,7 +1650,7 @@ function shootTarget(){
   const dir = tmpB.set(1, 0, 0).applyQuaternion(aim.getWorldQuaternion(new THREE.Quaternion()));
   const spread = 0.0012 + Math.min(0.012, S.streak*0.0018);
   dir.add(new THREE.Vector3(0, (Math.random()-0.5)*2*spread, (Math.random()-0.5)*2*spread)).normalize();
-  aimKick += 0.022 + (S.fold > 0.5 ? 0.01 : 0); aimYawT += (Math.random() - 0.5)*0.008; camShake = 1;   // muzzle climb, a little sideways, and the shoulder jolt
+  aimKick += 0.03 + (S.fold > 0.5 ? 0.012 : 0); aimYawT += (Math.random() - 0.5)*0.011; camShake = 1.3;   // muzzle climb, a little sideways, and the shoulder jolt
   if (Math.abs(dir.x) < 1e-4) return;
   const t = (TARGET_X - tmpA.x) / dir.x; if (t <= 0) return;
   const lp = target.worldToLocal(tmpA.clone().addScaledVector(dir, t));
@@ -1954,7 +1955,11 @@ function animate(){
     if (S.carrier < 0) S.carrier = 0;
   }
   if (S.carrier > 0.3) S.cocked = true;
-  if (S.ex > 0.05) S.carrier = 0;
+  if (S.ex > 0.05){ S.carrier = 0; S.homeArmed = false; }
+  // the carrier slams home under the recoil spring: a forward jolt through the rifle (muzzle dips, the shoulder feels it)
+  if (S.carrier > 0.5) S.homeArmed = true;
+  else if (S.homeArmed && S.carrier < 0.01){ S.homeArmed = false; S.kickV -= 6; S.riseV -= 3;
+    if (view === 'range'){ aimKick -= 0.007; aimYawT += (Math.random() - 0.5)*0.004; camShake = Math.max(camShake, 0.6); } }
   parts.carrier.position.set(-S.carrier, 0, 0); applySteps(parts.carrier.position, parts.CARRIER_STEPS);
   // recoil spring compresses as the carrier comes back
   parts.recoilSpring.scale.y = Math.max(0.3, 2.86 - S.carrier);   // supporter (x -1.06) to the stop inside the op-rod tube (x 1.8 - carrier)
@@ -1963,12 +1968,15 @@ function animate(){
   parts.bolt.visible = false; parts.bolt.scale.x = Math.max(0.001, (hi - lo)/0.85); parts.bolt.position.x = (lo + hi)/2;
   // whatever is in the chamber is held by the extractor and rides back on the bolt face until it clears the port
   if ((S.chambered || S.spent) && !S.feed && S.carrier > EJECT_AT*TRAVEL){ eject(S.chambered); S.chambered = S.spent = false; renderHud(); }
+  // pulled back again before the round being fed has settled: once it is off the lips the extractor has it, so it comes
+  // out of the port like any chambered round (it used to stay put while a second round was stripped on top of it)
+  if (S.feed && S.feed.maxE > 0.35 && S.carrier > EJECT_AT*TRAVEL){ S.feed = null; parts.feedRound.visible = false; parts.stack.position.y = 0; eject(true); S.chambered = false; renderHud(); }
   // feeding round: waits under the feed lips until the bolt face (x = 1.29 - carrier) catches its rim, then is pushed
   // forward, nose climbing the feed ramp, and drops in line with the bore as it enters the chamber
   if (S.feed){
     const fr = parts.feedRound, from = S.feed.from;
     const bx = Math.max(from.x, 1.29 - S.carrier), e = THREE.MathUtils.clamp((bx - from.x)/(1.28 - from.x), 0, 1);
-    const lift = THREE.MathUtils.smoothstep(e, 0.05, 0.75);
+    const lift = THREE.MathUtils.smoothstep(e, 0.05, 0.75); S.feed.maxE = Math.max(S.feed.maxE || 0, e);
     fr.visible = true;
     fr.position.set(Math.min(bx, 1.28), from.y + (BORE - from.y)*lift, from.z*(1 - lift));
     fr.rotation.z = -Math.PI/2 + Math.sin(Math.min(1, e*1.3)*Math.PI)*0.22;
@@ -2064,7 +2072,7 @@ function animate(){
     aimYaw += (aimYawT - aimYaw) * Math.min(1, dt*10);
     aimPitch += (aimPitchT - aimPitch) * Math.min(1, dt*10);
     aim.rotation.set((Math.random() - 0.5)*0.01*camShake, aimYaw + Math.sin(t*0.9)*0.002 + (Math.random() - 0.5)*0.004*camShake, aimPitch + aimKick + Math.sin(t*1.3)*0.0025);
-    camera.position.x = -0.06*camShake;   // the stock punches into the shoulder
+    camera.position.x = -0.075*camShake;   // the stock punches into the shoulder
   }
   updateCasings(dt);
   if (msgT > 0) msgT -= dt;
